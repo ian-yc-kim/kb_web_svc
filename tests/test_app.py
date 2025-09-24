@@ -104,8 +104,8 @@ class TestApp:
              patch('streamlit.error') as mock_error, \
              patch('kb_web_svc.database.check_db_connection', side_effect=test_exception) as mock_check_db:
             
-            # Patch logging.error in the app module's namespace
-            with patch('kb_web_svc.app.logging.error') as mock_logging_error:
+            # Patch logging.error directly from logging module
+            with patch('logging.error') as mock_logging_error:
                 # Import the app module after all patches are in place
                 import kb_web_svc.app
                 
