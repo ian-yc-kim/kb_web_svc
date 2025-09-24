@@ -1,0 +1,26 @@
+[tool.poetry]
+name = "kb_web_svc"
+version = "1.0.0"
+description = ""
+authors = ["AIdev"]
+readme = "README.md"
+packages = [{include = "kb_web_svc", from = "src"}]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+python-dotenv = "^1.0.1"
+pydantic = "^2.10.2"
+streamlit = "^1.42.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.3"
+
+[tool.poetry.scripts]
+kb_web_svc = "kb_web_svc.main:main"
+
+[tool.pytest.ini_options]
+pythonpath = [ "src/" ]
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
