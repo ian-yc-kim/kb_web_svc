@@ -128,23 +128,35 @@ def create_task(payload: TaskCreate, db: Session) -> Dict[str, Any]:
 
 
 def update_task(task_id: UUID, payload: TaskUpdate, db: Session) -> Dict[str, Any]:
-    """Update an existing task with field-specific updates and optimistic concurrency control.
+    """Update an existing task with partial field changes, ensuring atomic operations and optimistic concurrency control.
     
-    Args:
-        task_id: UUID of the task to update
-        payload: TaskUpdate Pydantic model with validated input data
-        db: SQLAlchemy database session
-        
-    Returns:
-        Dictionary representation of the updated task
-        
-    Raises:
-        TaskNotFoundError: When task with specified ID is not found
-        OptimisticConcurrencyError: When optimistic concurrency control detects a conflict
-        InvalidStatusError: When status is not a valid Status enum value
-        InvalidPriorityError: When priority is not a valid Priority enum value
-        PastDueDateError: When due_date is in the past
-        ValueError: When estimated_time is negative or other validation errors
+    This function performs field-specific updates on a task, validating all input data
+    and ensuring data consistency through database transactions. The expected_last_modified
+    timestamp in the payload supports optimistic concurrency control by comparing against
+    the task's current last_modified value (both converted to UTC for accurate comparison).
+    The last_modified field is automatically updated via SQLAlchemy event listeners.
+    
+    @param task_id (UUID): The unique identifier of the task to be updated
+    @param payload (TaskUpdate): Pydantic model containing optional fields for partial 
+                                 updates and the expected_last_modified timestamp for 
+                                 optimistic concurrency control
+    @param db (Session): SQLAlchemy database session for executing database operations
+    @returns (Dict[str, Any]): Dictionary representation of the updated task with all 
+                               field values properly serialized (enums as strings, 
+                               UUIDs as strings, timestamps as ISO format strings)
+    @raises TaskNotFoundError: When no task with the specified task_id is not found
+    @raises OptimisticConcurrencyError: When the expected_last_modified timestamp does 
+                                        not match the current task's last_modified, 
+                                        indicating concurrency conflict by another user
+    @raises InvalidStatusError: When the provided status value is invalid and not a valid Status 
+                                enum value (must be 'To Do', 'In Progress', or 'Done')
+    @raises InvalidPriorityError: When the provided priority value is invalid and not a valid 
+                                  Priority enum value (must be 'Critical', 'High', 
+                                  'Medium', or 'Low')
+    @raises PastDueDateError: When the provided due_date is in the past relative to 
+                              the current UTC date
+    @raises ValueError: When estimated_time is negative, title is empty after 
+                        trimming whitespace, or other validation constraints are violated
     """
     logger.info(f"Updating task with ID: {task_id}")
     
