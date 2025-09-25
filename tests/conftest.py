@@ -6,11 +6,14 @@ for fast and isolated test execution.
 
 import importlib
 import pytest
+from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.pool import StaticPool
 
 from kb_web_svc.models.base import Base
+from kb_web_svc.api.app import app
+from kb_web_svc.database import get_db
 import kb_web_svc.database
 
 
@@ -60,6 +63,34 @@ def db_session(db_engine):
         yield session
     finally:
         session.close()
+
+
+@pytest.fixture(scope="function")
+def client(db_session):
+    """Create a FastAPI test client with database dependency override.
+    
+    Args:
+        db_session: Database session fixture for dependency injection.
+        
+    Yields:
+        TestClient instance configured with test database session.
+    """
+    # Override the get_db dependency to use our test session
+    def override_get_db():
+        try:
+            yield db_session
+        finally:
+            pass  # Session cleanup handled by db_session fixture
+    
+    # Apply dependency override
+    app.dependency_overrides[get_db] = override_get_db
+    
+    # Create test client
+    with TestClient(app) as test_client:
+        yield test_client
+    
+    # Clean up dependency override
+    app.dependency_overrides.clear()
 
 
 @pytest.fixture(scope="function")
