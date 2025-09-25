@@ -13,12 +13,14 @@ from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from kb_web_svc.models.task import Task, Priority, Status
-from kb_web_svc.schemas.task import TaskCreate
+from kb_web_svc.schemas.task import TaskCreate, TaskUpdate
 from kb_web_svc.services.task_service import (
     create_task,
+    update_task,
     InvalidStatusError,
     InvalidPriorityError,
-    PastDueDateError
+    PastDueDateError,
+    OptimisticConcurrencyError
 )
 
 
@@ -476,3 +478,125 @@ class TestCreateTask:
         assert db_task.assignee is None
         assert db_task.description is None
         assert db_task.priority is None
+
+
+class TestUpdateTask:
+    """Additional test cases for the update_task service function.
+    
+    These tests complement the comprehensive tests in test_task_update_service.py
+    by covering specific scenarios requested in the action item.
+    """
+
+    def test_update_task_optimistic_concurrency_success(self, db_session: Session):
+        """Test successful update with matching expected_last_modified."""
+        # Create initial task
+        initial_task_data = TaskCreate(
+            title="Original title",
+            status="To Do"
+        )
+        created_task = create_task(initial_task_data, db_session)
+        task_id = uuid.UUID(created_task['id'])
+        
+        # Parse the last_modified timestamp from the created task
+        expected_last_modified = datetime.fromisoformat(created_task['last_modified'])
+        
+        # Ensure the datetime is timezone-aware (convert to UTC if naive)
+        if expected_last_modified.tzinfo is None:
+            expected_last_modified = expected_last_modified.replace(tzinfo=timezone.utc)
+        
+        # Prepare update data with matching expected_last_modified
+        update_data = TaskUpdate(
+            title="Updated via OCC",
+            expected_last_modified=expected_last_modified
+        )
+        
+        # Update task - should succeed
+        result = update_task(task_id, update_data, db_session)
+        
+        # Verify update succeeded
+        assert result['title'] == "Updated via OCC"
+        assert result['status'] == "To Do"  # Unchanged
+        
+        # Verify last_modified was updated
+        assert result['last_modified'] != created_task['last_modified']
+        
+        # Verify persistence in database
+        db_task = db_session.get(Task, task_id)
+        assert db_task.title == "Updated via OCC"
+        assert db_task.status == Status.TODO
+
+    def test_update_task_last_modified_auto_update(self, db_session: Session):
+        """Test that last_modified is automatically updated while created_at remains unchanged."""
+        # Create initial task
+        initial_task_data = TaskCreate(
+            title="Original title",
+            assignee="Original assignee",
+            status="To Do"
+        )
+        created_task = create_task(initial_task_data, db_session)
+        task_id = uuid.UUID(created_task['id'])
+        
+        # Record original timestamps
+        original_created_at = created_task['created_at']
+        original_last_modified = created_task['last_modified']
+        
+        # Wait a brief moment to ensure timestamp difference
+        import time
+        time.sleep(0.01)
+        
+        # Update task (simple title change)
+        update_data = TaskUpdate(
+            title="Updated title"
+        )
+        
+        result = update_task(task_id, update_data, db_session)
+        
+        # Verify timestamps: created_at unchanged, last_modified updated
+        assert result['created_at'] == original_created_at
+        assert result['last_modified'] != original_last_modified
+        
+        # Verify in database
+        db_task = db_session.get(Task, task_id)
+        assert db_task.created_at.isoformat() == original_created_at
+        assert db_task.last_modified.isoformat() == result['last_modified']
+        assert db_task.last_modified.isoformat() != original_last_modified
+
+    def test_update_task_whitespace_handling_success(self, db_session: Session):
+        """Test whitespace trimming for status, priority, assignee, and description fields."""
+        # Create initial task with baseline values
+        initial_task_data = TaskCreate(
+            title="Original title",
+            assignee="Original assignee",
+            description="Original description",
+            priority="Medium",
+            status="To Do"
+        )
+        created_task = create_task(initial_task_data, db_session)
+        task_id = uuid.UUID(created_task['id'])
+        
+        # Update with whitespace-padded values
+        update_data = TaskUpdate(
+            status="  In Progress  ",
+            priority="  High  ",
+            assignee="  Jane Doe  ",
+            description="  Updated description  "
+        )
+        
+        # Update task
+        result = update_task(task_id, update_data, db_session)
+        
+        # Verify all fields are properly trimmed
+        assert result['status'] == "In Progress"
+        assert result['priority'] == "High"
+        assert result['assignee'] == "Jane Doe"
+        assert result['description'] == "Updated description"
+        
+        # Verify last_modified was updated
+        assert result['last_modified'] != created_task['last_modified']
+        
+        # Verify persistence in database
+        db_task = db_session.get(Task, task_id)
+        assert db_task.status == Status.IN_PROGRESS
+        assert db_task.priority == Priority.HIGH
+        assert db_task.assignee == "Jane Doe"
+        assert db_task.description == "Updated description"
