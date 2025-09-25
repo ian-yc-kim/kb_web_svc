@@ -1,6 +1,29 @@
 # kb_web_svc
 
-Python Streamlit web application providing comprehensive kanban task management with 7-field task system, drag-and-drop functionality, and PostgreSQL persistence.
+Python Streamlit web application providing comprehensive kanban task management with 7-field task system, drag-and-drop functionality, and PostgreSQL persistence. Includes task creation, status management, export/import collaboration features, and responsive UI design.
+
+## Setup and Installation
+
+### Prerequisites
+
+Ensure you have Poetry installed on your system. If you don't have Poetry, install it by following the instructions at [https://python-poetry.org/docs/#installation](https://python-poetry.org/docs/#installation).
+
+### Installation Steps
+
+1. **Install dependencies:**
+   ```bash
+   poetry install
+   ```
+
+2. **Set up environment configuration:**
+   Create a `.env` file in the root directory of the project (see Database Configuration section below for details).
+
+3. **Run database migrations:**
+   ```bash
+   poetry run alembic upgrade head
+   ```
+
+This will set up your development environment with all necessary dependencies and prepare the database schema.
 
 ## Database Configuration
 
@@ -78,18 +101,71 @@ poetry run alembic downgrade base
 
 - **Development vs Production**: When working with SQLite for development, you can use a file-based database (`sqlite:///./test.db`) to persist data between application restarts. For production, use PostgreSQL with the appropriate connection string.
 
-### Running the Application
+## Running the Application
 
-After setting up your `.env` file with the desired database configuration:
+After completing the setup and installation steps, you have two options to run the application:
 
-1. Install dependencies:
-   ```bash
-   poetry install
-   ```
+### Option 1: Using the console script (Recommended)
+```bash
+poetry run kb_web_svc
+```
 
-2. Run the application:
-   ```bash
-   poetry run kb_web_svc
-   ```
+### Option 2: Direct Streamlit command
+```bash
+poetry run streamlit run src/kb_web_svc/app.py
+```
+
+### Accessing the Application
+Once started, open your web browser and navigate to [http://localhost:8501](http://localhost:8501) (default Streamlit port).
 
 The application will automatically load the environment variables from your `.env` file and connect to the specified database. If no `DATABASE_URL` is provided, it will use an in-memory SQLite database by default.
+
+## How to Create Tasks
+
+The application provides an intuitive web interface for creating and managing kanban tasks:
+
+1. **Access the task creation page:**
+   - Once the application is running, navigate to the "Create Task" tab in the Streamlit interface
+   - The tab is located in the main navigation area of the application
+
+2. **Fill out the task creation form:**
+   - **Title** (required): Enter a descriptive title for your task
+   - **Assignee** (optional): Specify who the task is assigned to
+   - **Labels** (optional): Add comma-separated labels for categorization (e.g., "frontend, urgent, bug-fix")
+   - **Due Date** (optional): Select a due date using the date picker
+   - **Priority** (optional): Choose from Critical, High, Medium, or Low priority levels
+   - **Status** (required): Select the initial status - To Do, In Progress, or Done
+   - **Description** (optional): Provide detailed information about the task
+   - **Estimated Time** (optional): Use the "Advanced Options" section to specify estimated time in hours
+
+3. **Submit the task:**
+   - Click the "Create Task" button to save your task
+   - The system will validate your input and provide feedback
+   - Successfully created tasks are automatically persisted to the database
+   - You'll see a success message confirming the task creation
+
+4. **Task validation:**
+   - The system automatically validates input fields
+   - Due dates cannot be set in the past
+   - Priority and status values must be from the predefined lists
+   - Error messages will guide you if any validation fails
+
+## Running Tests
+
+The project includes comprehensive unit tests to ensure code quality and functionality:
+
+```bash
+poetry run pytest
+```
+
+**Important:** The tests use an SQLite in-memory database for isolation and speed. You don't need to connect to a real PostgreSQL database to run the tests - the testing framework automatically handles database setup and teardown for each test.
+
+### Test Coverage
+
+The test suite covers:
+- Database models and ORM functionality
+- Task service layer business logic
+- Streamlit UI components
+- Database connection and session management
+- Input validation and error handling
+- Data persistence and retrieval
