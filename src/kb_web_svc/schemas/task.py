@@ -85,6 +85,100 @@ class TaskCreate(BaseModel):
         return cleaned_labels if cleaned_labels else None
 
 
+class TaskUpdate(BaseModel):
+    """Input schema for updating an existing task with partial updates.
+    
+    This model validates and sanitizes input data for task updates,
+    supporting partial updates where all fields are optional. Includes
+    optimistic concurrency control through expected_last_modified field.
+    """
+    title: Optional[str] = Field(None, description="Task title")
+    assignee: Optional[str] = Field(None, description="Person assigned to the task")
+    due_date: Optional[date] = Field(None, description="Task due date")
+    description: Optional[str] = Field(None, description="Detailed task description")
+    priority: Optional[str] = Field(None, description="Task priority level")
+    labels: Optional[List[str]] = Field(None, description="List of task labels")
+    estimated_time: Optional[float] = Field(None, ge=0.0, description="Estimated time in hours")
+    status: Optional[str] = Field(None, description="Task status")
+    expected_last_modified: Optional[datetime] = Field(
+        None, 
+        description="Timestamp of the task's last modification at the time of retrieval, used for optimistic concurrency control. Must be timezone-aware (UTC)."
+    )
+    
+    @field_validator('title')
+    @classmethod
+    def validate_title(cls, v: Optional[str]) -> Optional[str]:
+        """Validate that title is non-empty after stripping whitespace if provided."""
+        if v is None:
+            return v
+        stripped = v.strip() if isinstance(v, str) else v
+        if not stripped:
+            raise ValueError("Title cannot be empty")
+        return stripped
+    
+    @field_validator('priority')
+    @classmethod
+    def validate_priority(cls, v: Optional[str]) -> Optional[str]:
+        """Validate priority is a valid enum value if provided."""
+        if v is None:
+            return v
+        stripped = v.strip() if isinstance(v, str) else v
+        if not stripped:
+            return None
+        return stripped
+    
+    @field_validator('status')
+    @classmethod
+    def validate_status(cls, v: Optional[str]) -> Optional[str]:
+        """Validate that status is non-empty after stripping whitespace if provided."""
+        if v is None:
+            return v
+        stripped = v.strip() if isinstance(v, str) else v
+        if not stripped:
+            raise ValueError("Status cannot be empty")
+        return stripped
+    
+    @field_validator('assignee')
+    @classmethod
+    def validate_assignee(cls, v: Optional[str]) -> Optional[str]:
+        """Validate and normalize assignee field."""
+        if v is None:
+            return v
+        stripped = v.strip() if isinstance(v, str) else v
+        return stripped if stripped else None
+    
+    @field_validator('description')
+    @classmethod
+    def validate_description(cls, v: Optional[str]) -> Optional[str]:
+        """Validate and normalize description field."""
+        if v is None:
+            return v
+        stripped = v.strip() if isinstance(v, str) else v
+        return stripped if stripped else None
+    
+    @field_validator('labels')
+    @classmethod
+    def validate_labels(cls, v: Optional[List[str]]) -> Optional[List[str]]:
+        """Validate labels is a list of strings if provided."""
+        if v is None:
+            return v
+        if not isinstance(v, list):
+            raise ValueError("Labels must be a list of strings")
+        # Strip whitespace from each label and filter out empty ones
+        cleaned_labels = [label.strip() for label in v if isinstance(label, str) and label.strip()]
+        return cleaned_labels if cleaned_labels else None
+    
+    @field_validator('expected_last_modified')
+    @classmethod
+    def validate_expected_last_modified(cls, v: Optional[datetime]) -> Optional[datetime]:
+        """Validate that expected_last_modified is timezone-aware if provided."""
+        if v is None:
+            return v
+        if v.tzinfo is None:
+            raise ValueError("expected_last_modified must be timezone-aware. Please provide a UTC datetime with timezone information.")
+        return v
+
+
 class TaskFilterParams(BaseModel):
     """Filter parameters for task queries with pagination and sorting.
     
