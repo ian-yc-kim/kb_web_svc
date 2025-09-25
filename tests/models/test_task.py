@@ -47,6 +47,8 @@ class TestTaskModel:
         assert retrieved_task.estimated_time == 8.5
         assert retrieved_task.status == Status.TODO
         assert isinstance(retrieved_task.id, uuid.UUID)
+        # Test deleted_at default value
+        assert retrieved_task.deleted_at is None
 
     def test_task_required_fields_title(self, db_session):
         """Test that title field is required and cannot be null."""
@@ -73,6 +75,83 @@ class TestTaskModel:
         # Should raise IntegrityError due to nullable=False constraint
         with pytest.raises(IntegrityError):
             db_session.commit()
+
+    def test_deleted_at_soft_deletion_functionality(self, db_session):
+        """Test deleted_at column for soft deletion functionality."""
+        # Create task without deleted_at (should default to None)
+        task = Task(
+            title="Task for Soft Deletion Test",
+            status=Status.TODO
+        )
+        
+        db_session.add(task)
+        db_session.commit()
+        
+        # Verify deleted_at is None by default
+        retrieved_task = db_session.get(Task, task.id)
+        assert retrieved_task.deleted_at is None
+        
+        # Mark task as deleted by setting deleted_at timestamp
+        deletion_time = datetime.now(timezone.utc)
+        task.deleted_at = deletion_time
+        db_session.commit()
+        
+        # Verify deleted_at was set correctly
+        retrieved_task = db_session.get(Task, task.id)
+        assert retrieved_task.deleted_at is not None
+        assert retrieved_task.deleted_at == deletion_time
+        assert isinstance(retrieved_task.deleted_at, datetime)
+        assert retrieved_task.deleted_at.tzinfo is not None  # Timezone-aware
+        
+        # Test "undeleting" by setting deleted_at back to None
+        task.deleted_at = None
+        db_session.commit()
+        
+        retrieved_task = db_session.get(Task, task.id)
+        assert retrieved_task.deleted_at is None
+
+    def test_deleted_at_explicit_none_assignment(self, db_session):
+        """Test that deleted_at can be explicitly set to None."""
+        task = Task(
+            title="Explicit None Test Task",
+            status=Status.TODO,
+            deleted_at=None  # Explicitly set to None
+        )
+        
+        db_session.add(task)
+        db_session.commit()
+        
+        retrieved_task = db_session.get(Task, task.id)
+        assert retrieved_task.deleted_at is None
+
+    def test_deleted_at_with_timezone_handling(self, db_session):
+        """Test that deleted_at properly handles timezone-aware datetimes."""
+        # Test with UTC timezone
+        utc_time = datetime.now(timezone.utc)
+        task = Task(
+            title="UTC Timezone Test Task",
+            status=Status.TODO,
+            deleted_at=utc_time
+        )
+        
+        db_session.add(task)
+        db_session.commit()
+        
+        retrieved_task = db_session.get(Task, task.id)
+        assert retrieved_task.deleted_at == utc_time
+        assert retrieved_task.deleted_at.tzinfo is not None
+        
+        # Test with different timezone
+        import zoneinfo
+        est_tz = zoneinfo.ZoneInfo("US/Eastern")
+        est_time = datetime.now(est_tz)
+        
+        task.deleted_at = est_time
+        db_session.commit()
+        
+        retrieved_task = db_session.get(Task, task.id)
+        assert retrieved_task.deleted_at == est_time
+        assert retrieved_task.deleted_at.tzinfo is not None
 
     def test_priority_enum_validation_valid_values(self, db_session):
         """Test Priority enum accepts valid values."""
@@ -295,10 +374,36 @@ class TestTaskModel:
         assert task_dict['status'] == "In Progress"  # Enum value as string
         assert isinstance(task_dict['created_at'], str)  # DateTime as ISO string
         assert isinstance(task_dict['last_modified'], str)  # DateTime as ISO string
+        assert task_dict['deleted_at'] is None  # deleted_at should be None by default
         
         # Verify timestamp formats are valid ISO strings
         datetime.fromisoformat(task_dict['created_at'].replace('Z', '+00:00'))
         datetime.fromisoformat(task_dict['last_modified'].replace('Z', '+00:00'))
+
+    def test_to_dict_serialization_with_deleted_at(self, db_session):
+        """Test to_dict() method includes deleted_at when set."""
+        # Create task and set deleted_at
+        deletion_time = datetime.now(timezone.utc)
+        task = Task(
+            title="Deleted Task Test",
+            status=Status.DONE,
+            deleted_at=deletion_time
+        )
+        
+        db_session.add(task)
+        db_session.commit()
+        
+        task_dict = task.to_dict()
+        
+        # Verify deleted_at is properly serialized
+        assert task_dict['deleted_at'] is not None
+        assert isinstance(task_dict['deleted_at'], str)
+        
+        # Verify it's a valid ISO format timestamp
+        parsed_datetime = datetime.fromisoformat(task_dict['deleted_at'].replace('Z', '+00:00'))
+        # Should be within 1 second of the original time (accounting for microsecond precision)
+        time_diff = abs((deletion_time - parsed_datetime).total_seconds())
+        assert time_diff < 1.0
 
     def test_to_dict_serialization_with_none_values(self, db_session):
         """Test to_dict() method handles None values correctly."""
@@ -320,6 +425,7 @@ class TestTaskModel:
         assert task_dict['priority'] is None
         assert task_dict['labels'] == []  # None labels become empty list
         assert task_dict['estimated_time'] is None
+        assert task_dict['deleted_at'] is None  # deleted_at should be None
         
         # Required fields should still be present
         assert task_dict['title'] == "Minimal Task"
@@ -357,7 +463,8 @@ class TestTaskModel:
             description=None,
             priority=None,
             labels=None,
-            estimated_time=None
+            estimated_time=None,
+            deleted_at=None  # Test deleted_at can be None
         )
         
         db_session.add(task)
@@ -371,6 +478,7 @@ class TestTaskModel:
         assert retrieved_task.priority is None
         assert retrieved_task.labels is None
         assert retrieved_task.estimated_time is None
+        assert retrieved_task.deleted_at is None  # Test deleted_at is None
         
         # Required fields should still work
         assert retrieved_task.title == "Optional Fields Test"

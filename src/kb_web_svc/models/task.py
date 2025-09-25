@@ -120,6 +120,7 @@ class Task(Base):
     status = Column(StatusEnumType, nullable=False)
     created_at = Column(DateTime(timezone=True), nullable=False)
     last_modified = Column(DateTime(timezone=True), nullable=False)
+    deleted_at = Column(DateTime(timezone=True), nullable=True, default=None)
     
     def __init__(self, **kwargs):
         """Initialize Task with synchronized timestamps."""
@@ -131,6 +132,7 @@ class Task(Base):
             kwargs['created_at'] = now
         if 'last_modified' not in kwargs:
             kwargs['last_modified'] = now
+        # Note: deleted_at is left to default behavior (None)
             
         super().__init__(**kwargs)
     
@@ -156,7 +158,8 @@ class Task(Base):
             'estimated_time': self.estimated_time,
             'status': self.status.value,
             'created_at': self.created_at.isoformat(),
-            'last_modified': self.last_modified.isoformat()
+            'last_modified': self.last_modified.isoformat(),
+            'deleted_at': self.deleted_at.isoformat() if self.deleted_at else None
         }
     
     def __repr__(self):
