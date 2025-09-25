@@ -2,7 +2,10 @@ import streamlit as st
 import logging
 
 # Import database functionality
-from .database import check_db_connection
+from .database import get_db
+
+# Import state management functions
+from .state_management import initialize_session_state, load_tasks_from_db_to_session
 
 # Global configuration (if needed)
 st.set_page_config(page_title="kb_web_svc App", layout="wide")
@@ -12,41 +15,40 @@ logger = logging.getLogger(__name__)
 
 
 def render_ui() -> None:
-    """Render the main UI with database connection test functionality.
+    """Render the main UI with session state initialization and task loading.
     
-    This function creates a button that allows users to test database connectivity.
-    When clicked, it calls check_db_connection() and displays the result.
+    This function initializes the Streamlit session state and loads tasks from the database,
+    then displays the current board state for verification.
     """
-    st.title("Database Connection Test")
+    # Initialize session state first
+    initialize_session_state()
     
-    if st.button("Test Database Connection"):
-        logger.info("Testing database connection...")
-        
-        try:
-            result = check_db_connection()
-            
-            if result:
-                st.success("Database connection successful!")
-                logger.info("Database connection test: SUCCESS")
-            else:
-                st.error("Database connection failed!")
-                logger.info("Database connection test: FAILED")
-                
-        except Exception as e:
-            st.error("Database connection failed!")
-            # Log the raw exception object as expected by tests
-            logging.error(e, exc_info=True)
-
-
-def render_db_connection_check() -> None:
-    """Render the database connection check UI component.
+    # Load tasks from database into session state
+    db_gen = None
+    try:
+        db_gen = get_db()
+        db = next(db_gen)
+        load_tasks_from_db_to_session(db)
+        logger.info("Successfully loaded tasks from database to session state")
+    except Exception as e:
+        logger.error(e, exc_info=True)
+        # Continue rendering UI even if task loading fails
+    finally:
+        # Ensure generator cleanup
+        if db_gen is not None:
+            try:
+                next(db_gen)
+            except StopIteration:
+                pass  # Generator properly closed
+            except Exception as cleanup_error:
+                logger.error(f"Error during database cleanup: {cleanup_error}", exc_info=True)
     
-    This function creates a button that allows users to test database connectivity.
-    When clicked, it calls check_db_connection() and displays the result.
+    # Display the kanban board UI
+    st.title("Kanban Board")
     
-    This function is kept for backward compatibility but delegates to render_ui.
-    """
-    render_ui()
+    # Temporary UI component to display the loaded session state for verification
+    st.subheader("Current Board State:")
+    st.json(st.session_state.tasks_by_status)
 
 
 # Render the main UI
