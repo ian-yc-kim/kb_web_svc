@@ -85,6 +85,33 @@ class TaskCreate(BaseModel):
         return cleaned_labels if cleaned_labels else None
 
 
+class TaskFilterParams(BaseModel):
+    """Filter parameters for task queries with pagination and sorting.
+    
+    This model provides comprehensive filtering, pagination, and sorting
+    capabilities for task retrieval operations.
+    """
+    status: Optional[str] = Field(None, description="Filter by task status")
+    priority: Optional[str] = Field(None, description="Filter by task priority")
+    assignee: Optional[str] = Field(None, description="Filter by assignee (case-insensitive partial match)")
+    due_date_start: Optional[date] = Field(None, description="Filter tasks due on or after this date")
+    due_date_end: Optional[date] = Field(None, description="Filter tasks due on or before this date")
+    search_term: Optional[str] = Field(None, description="Search in task title and description (case-insensitive)")
+    limit: int = Field(10, ge=1, description="Maximum number of results to return")
+    offset: int = Field(0, ge=0, description="Number of results to skip for pagination")
+    sort_by: str = Field("created_at", description="Field to sort by (created_at, due_date, priority)")
+    sort_order: str = Field("desc", description="Sort order (asc, desc)")
+    
+    @field_validator('status', 'priority', 'assignee', 'search_term')
+    @classmethod
+    def clean_optional_strings(cls, v: Optional[str]) -> Optional[str]:
+        """Strip whitespace from optional string fields, convert empty strings to None."""
+        if v is None:
+            return None
+        stripped = v.strip() if isinstance(v, str) else v
+        return stripped if stripped else None
+
+
 class TaskResponse(BaseModel):
     """Output schema for task responses.
     
