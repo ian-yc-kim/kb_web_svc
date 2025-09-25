@@ -6,11 +6,16 @@ and proper error handling using mocked dependencies.
 
 import pytest
 from unittest.mock import MagicMock, patch, call
+from uuid import UUID, uuid4
 from sqlalchemy.orm import Session
 
 from kb_web_svc.models.task import Status
 from kb_web_svc.schemas.task import TaskFilterParams
-from kb_web_svc.state_management import initialize_session_state, load_tasks_from_db_to_session
+from kb_web_svc.state_management import (
+    initialize_session_state, load_tasks_from_db_to_session,
+    add_task_to_session, update_task_in_session, delete_task_from_session,
+    get_tasks_by_status, get_all_tasks_from_session
+)
 
 
 class TestInitializeSessionState:
@@ -389,3 +394,180 @@ class TestLoadTasksFromDbToSession:
         assert "existing2" not in task_ids
         assert "new1" in task_ids
         assert "new2" in task_ids
+
+
+class TestAddTaskToSession:
+    """Test cases for the add_task_to_session function."""
+
+    def test_add_task_to_session_success(self, monkeypatch):
+        """Test adding a task to session state successfully."""
+        mock_st = MagicMock()
+        mock_st.session_state.tasks_by_status = {"To Do": [], "In Progress": [], "Done": []}
+        monkeypatch.setattr('kb_web_svc.state_management.st', mock_st)
+        
+        task_dict = {"id": "1", "title": "Test Task", "status": "In Progress"}
+        add_task_to_session(task_dict)
+        
+        assert task_dict in mock_st.session_state.tasks_by_status["In Progress"]
+        assert len(mock_st.session_state.tasks_by_status["In Progress"]) == 1
+
+    def test_add_task_to_session_initializes_status_list(self, monkeypatch):
+        """Test that missing status list is initialized."""
+        mock_st = MagicMock()
+        mock_st.session_state.tasks_by_status = {}
+        monkeypatch.setattr('kb_web_svc.state_management.st', mock_st)
+        
+        task_dict = {"id": "1", "title": "Test Task", "status": "New Status"}
+        add_task_to_session(task_dict)
+        
+        assert "New Status" in mock_st.session_state.tasks_by_status
+        assert task_dict in mock_st.session_state.tasks_by_status["New Status"]
+
+    def test_add_task_to_session_missing_status(self, monkeypatch):
+        """Test handling task without status field."""
+        mock_st = MagicMock()
+        mock_st.session_state.tasks_by_status = {}
+        monkeypatch.setattr('kb_web_svc.state_management.st', mock_st)
+        
+        mock_logger = MagicMock()
+        monkeypatch.setattr('kb_web_svc.state_management.logger', mock_logger)
+        
+        task_dict = {"id": "1", "title": "Test Task"}
+        add_task_to_session(task_dict)
+        
+        mock_logger.warning.assert_called_once()
+        assert len(mock_st.session_state.tasks_by_status) == 0
+
+
+class TestUpdateTaskInSession:
+    """Test cases for the update_task_in_session function."""
+
+    def test_update_task_in_session_success(self, monkeypatch):
+        """Test updating an existing task and moving between statuses."""
+        mock_st = MagicMock()
+        mock_st.session_state.tasks_by_status = {
+            "To Do": [{"id": "1", "title": "Old Task", "status": "To Do"}],
+            "Done": []
+        }
+        monkeypatch.setattr('kb_web_svc.state_management.st', mock_st)
+        
+        updated_task = {"id": "1", "title": "Updated Task", "status": "Done"}
+        update_task_in_session(updated_task)
+        
+        assert len(mock_st.session_state.tasks_by_status["To Do"]) == 0
+        assert updated_task in mock_st.session_state.tasks_by_status["Done"]
+        assert len(mock_st.session_state.tasks_by_status["Done"]) == 1
+
+    def test_update_task_in_session_nonexistent_task(self, monkeypatch):
+        """Test updating a non-existent task (should be no-op)."""
+        mock_st = MagicMock()
+        mock_st.session_state.tasks_by_status = {"To Do": []}
+        monkeypatch.setattr('kb_web_svc.state_management.st', mock_st)
+        
+        updated_task = {"id": "999", "title": "Non-existent Task", "status": "To Do"}
+        update_task_in_session(updated_task)
+        
+        assert len(mock_st.session_state.tasks_by_status["To Do"]) == 0
+
+    def test_update_task_in_session_missing_id(self, monkeypatch):
+        """Test handling task update without id field."""
+        mock_st = MagicMock()
+        mock_st.session_state.tasks_by_status = {}
+        monkeypatch.setattr('kb_web_svc.state_management.st', mock_st)
+        
+        mock_logger = MagicMock()
+        monkeypatch.setattr('kb_web_svc.state_management.logger', mock_logger)
+        
+        task_dict = {"title": "Test Task", "status": "To Do"}
+        update_task_in_session(task_dict)
+        
+        mock_logger.warning.assert_called_once()
+
+
+class TestDeleteTaskFromSession:
+    """Test cases for the delete_task_from_session function."""
+
+    def test_delete_task_from_session_success(self, monkeypatch):
+        """Test deleting an existing task successfully."""
+        task_id = uuid4()
+        mock_st = MagicMock()
+        mock_st.session_state.tasks_by_status = {
+            "To Do": [{"id": str(task_id), "title": "Task to Delete"}],
+            "Done": [{"id": "other", "title": "Other Task"}]
+        }
+        monkeypatch.setattr('kb_web_svc.state_management.st', mock_st)
+        
+        delete_task_from_session(task_id)
+        
+        assert len(mock_st.session_state.tasks_by_status["To Do"]) == 0
+        assert len(mock_st.session_state.tasks_by_status["Done"]) == 1  # Other task remains
+
+    def test_delete_task_from_session_nonexistent(self, monkeypatch):
+        """Test deleting a non-existent task (should be no-op)."""
+        mock_st = MagicMock()
+        mock_st.session_state.tasks_by_status = {"To Do": [{"id": "other", "title": "Other Task"}]}
+        monkeypatch.setattr('kb_web_svc.state_management.st', mock_st)
+        
+        non_existent_id = uuid4()
+        delete_task_from_session(non_existent_id)
+        
+        assert len(mock_st.session_state.tasks_by_status["To Do"]) == 1  # Task remains unchanged
+
+
+class TestGetTasksByStatus:
+    """Test cases for the get_tasks_by_status function."""
+
+    def test_get_tasks_by_status_success(self, monkeypatch):
+        """Test retrieving tasks by status successfully."""
+        mock_st = MagicMock()
+        expected_tasks = [{"id": "1", "title": "Task 1"}, {"id": "2", "title": "Task 2"}]
+        mock_st.session_state.tasks_by_status = {"To Do": expected_tasks, "Done": []}
+        monkeypatch.setattr('kb_web_svc.state_management.st', mock_st)
+        
+        result = get_tasks_by_status("To Do")
+        
+        assert result == expected_tasks
+        assert len(result) == 2
+
+    def test_get_tasks_by_status_unknown_status(self, monkeypatch):
+        """Test retrieving tasks for unknown status returns empty list."""
+        mock_st = MagicMock()
+        mock_st.session_state.tasks_by_status = {"To Do": [{"id": "1", "title": "Task 1"}]}
+        monkeypatch.setattr('kb_web_svc.state_management.st', mock_st)
+        
+        result = get_tasks_by_status("Unknown Status")
+        
+        assert result == []
+
+
+class TestGetAllTasksFromSession:
+    """Test cases for the get_all_tasks_from_session function."""
+
+    def test_get_all_tasks_from_session_success(self, monkeypatch):
+        """Test retrieving all tasks from multiple statuses."""
+        mock_st = MagicMock()
+        todo_tasks = [{"id": "1", "title": "Task 1"}]
+        done_tasks = [{"id": "2", "title": "Task 2"}, {"id": "3", "title": "Task 3"}]
+        mock_st.session_state.tasks_by_status = {
+            "To Do": todo_tasks,
+            "In Progress": [],
+            "Done": done_tasks
+        }
+        monkeypatch.setattr('kb_web_svc.state_management.st', mock_st)
+        
+        result = get_all_tasks_from_session()
+        
+        assert len(result) == 3
+        assert todo_tasks[0] in result
+        assert done_tasks[0] in result
+        assert done_tasks[1] in result
+
+    def test_get_all_tasks_from_session_empty(self, monkeypatch):
+        """Test retrieving all tasks when session state is empty."""
+        mock_st = MagicMock()
+        mock_st.session_state.tasks_by_status = {"To Do": [], "Done": []}
+        monkeypatch.setattr('kb_web_svc.state_management.st', mock_st)
+        
+        result = get_all_tasks_from_session()
+        
+        assert result == []
