@@ -7,6 +7,7 @@ for task management operations.
 from .task_service import (
     create_task, 
     update_task,
+    delete_task,
     InvalidStatusError, 
     InvalidPriorityError, 
     PastDueDateError,
@@ -17,6 +18,7 @@ from .task_service import (
 __all__ = [
     "create_task", 
     "update_task",
+    "delete_task",
     "InvalidStatusError", 
     "InvalidPriorityError", 
     "PastDueDateError",

@@ -259,6 +259,57 @@ def update_task(task_id: UUID, payload: TaskUpdate, db: Session) -> Dict[str, An
         raise
 
 
+def delete_task(task_id: UUID, db: Session, soft: bool = True) -> Dict[str, Any]:
+    """Delete a task with support for both soft and hard deletion.
+    
+    Args:
+        task_id: UUID of the task to delete
+        db: SQLAlchemy database session
+        soft: Boolean flag for soft delete (default True). If True, sets deleted_at timestamp.
+              If False, permanently removes the task from database.
+        
+    Returns:
+        Dictionary containing deletion success message and task ID
+        
+    Raises:
+        TaskNotFoundError: When no task with the specified task_id is found
+        Exception: Re-raises any database errors after logging and rollback
+    """
+    logger.info(f"Deleting task with ID: {task_id}, soft delete: {soft}")
+    
+    try:
+        # Fetch the existing task
+        task = db.get(Task, task_id)
+        if task is None:
+            raise TaskNotFoundError(f"Task with ID {task_id} not found")
+        
+        if soft:
+            # Soft delete: Set deleted_at timestamp
+            task.deleted_at = datetime.now(timezone.utc)
+            db.add(task)
+            # Note: last_modified will be automatically updated by the before_update event listener
+            message = "Task soft-deleted successfully"
+        else:
+            # Hard delete: Permanently remove from database
+            db.delete(task)
+            message = "Task hard-deleted successfully"
+        
+        # Commit the changes
+        db.commit()
+        
+        logger.info(f"Successfully deleted task with ID: {task_id} (soft: {soft})")
+        
+        return {
+            "message": message,
+            "task_id": str(task_id)
+        }
+        
+    except Exception as e:
+        logger.error(e, exc_info=True)
+        db.rollback()
+        raise
+
+
 def get_task_by_id(db: Session, task_id: UUID) -> Optional[Dict[str, Any]]:
     """Retrieve a task by its UUID.
     

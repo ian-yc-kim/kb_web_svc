@@ -241,3 +241,22 @@ class TaskResponse(BaseModel):
             }
         }
     }
+
+
+class TaskDeleteResponse(BaseModel):
+    """Response schema for task deletion operations.
+    
+    This model represents the response returned after successfully
+    deleting a task (both soft and hard deletion).
+    """
+    message: str = Field(..., description="Success message indicating the type of deletion performed")
+    task_id: UUID = Field(..., description="UUID of the deleted task")
+    
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "message": "Task soft-deleted successfully",
+                "task_id": "123e4567-e89b-12d3-a456-426614174000"
+            }
+        }
+    }
