@@ -120,6 +120,72 @@ Once started, open your web browser and navigate to [http://localhost:8501](http
 
 The application will automatically load the environment variables from your `.env` file and connect to the specified database. If no `DATABASE_URL` is provided, it will use an in-memory SQLite database by default.
 
+## Session State Management
+
+The application uses Streamlit's `st.session_state` to maintain application state and task data across user interactions within a browser session. This ensures that task data and UI state persist as users navigate and interact with the kanban board.
+
+### Purpose and Initialization
+
+The session state management serves two primary purposes:
+1. **Task Data Persistence**: Maintains the current state of all tasks organized by their status columns
+2. **UI State Management**: Preserves form inputs, component states, and user interface preferences during the session
+
+The session state is initialized automatically when the application loads via the `initialize_session_state()` function. This function is idempotent - it only initializes the state structures once and will skip re-initialization on subsequent calls.
+
+### Core Session State Variables
+
+The session state contains three main data structures:
+
+#### `tasks_by_status`
+A dictionary that organizes all active tasks by their status columns:
+```python
+{
+    "To Do": [list of task dictionaries],
+    "In Progress": [list of task dictionaries], 
+    "Done": [list of task dictionaries]
+}
+```
+
+Each task dictionary contains the complete task data including id, title, assignee, due_date, description, priority, labels, estimated_time, status, and timestamps.
+
+#### `form_states`
+A dictionary for storing form-related ephemeral state such as form inputs, validation states, and temporary data during task creation or editing.
+
+#### `ui_states`
+A dictionary for maintaining UI component states like expanded/collapsed sections, toggle states, filters, and other interface preferences.
+
+### State Management Module
+
+All session state logic is implemented in `src/kb_web_svc/state_management.py`. The main application file (`src/kb_web_svc/app.py`) calls `initialize_session_state()` during startup to ensure proper state initialization.
+
+### Developer Usage
+
+For developers working with the session state, several helper functions are available:
+
+```python
+from kb_web_svc.state_management import (
+    initialize_session_state,
+    get_tasks_by_status,
+    add_task_to_session,
+    update_task_in_session,
+    delete_task_from_session,
+)
+
+# Initialize session state (called automatically on app load)
+initialize_session_state()
+
+# Read tasks for a specific status column
+todo_tasks = get_tasks_by_status("To Do")
+
+# Add a new task to the session state
+add_task_to_session({"id": "...", "title": "New Task", "status": "To Do"})
+
+# Update an existing task (moves between status columns if needed)
+update_task_in_session({"id": "...", "title": "Updated Task", "status": "In Progress"})
+```
+
+The session state automatically syncs with the database - tasks are loaded from the database during initialization and any changes made through the UI are reflected in both the session state and persisted to the database.
+
 ## How to Create Tasks
 
 The application provides an intuitive web interface for creating and managing kanban tasks:
