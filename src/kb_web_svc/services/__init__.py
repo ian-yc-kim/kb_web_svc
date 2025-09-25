@@ -4,6 +4,22 @@ This package contains business logic and service layer implementations
 for task management operations.
 """
 
-from .task_service import create_task, InvalidStatusError, InvalidPriorityError, PastDueDateError
+from .task_service import (
+    create_task, 
+    update_task,
+    InvalidStatusError, 
+    InvalidPriorityError, 
+    PastDueDateError,
+    TaskNotFoundError,
+    OptimisticConcurrencyError
+)
 
-__all__ = ["create_task", "InvalidStatusError", "InvalidPriorityError", "PastDueDateError"]
+__all__ = [
+    "create_task", 
+    "update_task",
+    "InvalidStatusError", 
+    "InvalidPriorityError", 
+    "PastDueDateError",
+    "TaskNotFoundError",
+    "OptimisticConcurrencyError"
+]

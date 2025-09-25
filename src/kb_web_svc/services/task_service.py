@@ -13,7 +13,7 @@ from sqlalchemy import select, func, case, or_
 from sqlalchemy.orm import Session
 
 from ..models.task import Task, Priority, Status
-from ..schemas.task import TaskCreate, TaskFilterParams
+from ..schemas.task import TaskCreate, TaskFilterParams, TaskUpdate
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +30,16 @@ class InvalidPriorityError(ValueError):
 
 class PastDueDateError(ValueError):
     """Exception raised when due date is in the past."""
+    pass
+
+
+class TaskNotFoundError(ValueError):
+    """Exception raised when a task with the specified ID is not found."""
+    pass
+
+
+class OptimisticConcurrencyError(ValueError):
+    """Exception raised when optimistic concurrency control detects a conflict."""
     pass
 
 
@@ -114,6 +124,126 @@ def create_task(payload: TaskCreate, db: Session) -> Dict[str, Any]:
     except Exception as e:
         logger.error(e, exc_info=True)
         db.rollback()
+        raise
+
+
+def update_task(task_id: UUID, payload: TaskUpdate, db: Session) -> Dict[str, Any]:
+    """Update an existing task with field-specific updates and optimistic concurrency control.
+    
+    Args:
+        task_id: UUID of the task to update
+        payload: TaskUpdate Pydantic model with validated input data
+        db: SQLAlchemy database session
+        
+    Returns:
+        Dictionary representation of the updated task
+        
+    Raises:
+        TaskNotFoundError: When task with specified ID is not found
+        OptimisticConcurrencyError: When optimistic concurrency control detects a conflict
+        InvalidStatusError: When status is not a valid Status enum value
+        InvalidPriorityError: When priority is not a valid Priority enum value
+        PastDueDateError: When due_date is in the past
+        ValueError: When estimated_time is negative or other validation errors
+    """
+    logger.info(f"Updating task with ID: {task_id}")
+    
+    try:
+        # Fetch the existing task
+        task = db.get(Task, task_id)
+        if task is None:
+            raise TaskNotFoundError(f"Task with ID {task_id} not found")
+        
+        # Implement optimistic concurrency control
+        if payload.expected_last_modified is not None:
+            # Convert payload timestamp to UTC for comparison
+            expected_last_modified = payload.expected_last_modified.astimezone(timezone.utc)
+            
+            # Convert task timestamp to UTC for comparison (handle SQLite naive datetime)
+            task_last_modified = task.last_modified
+            if task_last_modified.tzinfo is None:
+                # SQLite returns naive datetimes - assume they are UTC
+                task_last_modified = task_last_modified.replace(tzinfo=timezone.utc)
+            else:
+                task_last_modified = task_last_modified.astimezone(timezone.utc)
+            
+            if expected_last_modified != task_last_modified:
+                raise OptimisticConcurrencyError(
+                    f"Task with ID {task_id} has been modified by another user. Please refresh and try again."
+                )
+        
+        # Get fields that were explicitly provided (including those that became None after validation)
+        all_update_data = payload.model_dump(exclude_unset=True)
+        all_update_data.pop('expected_last_modified', None)
+        
+        # Process each field for update
+        for field_name in all_update_data.keys():
+            field_value = getattr(payload, field_name)
+            
+            if field_name == 'title':
+                if field_value is not None:
+                    title = field_value.strip()
+                    if not title:
+                        raise ValueError("Title cannot be empty")
+                    task.title = title
+            
+            elif field_name == 'status':
+                if field_value is not None:
+                    try:
+                        status = Status(field_value)
+                        task.status = status
+                    except ValueError:
+                        valid_statuses = [s.value for s in Status]
+                        raise InvalidStatusError(f"Invalid status '{field_value}'. Must be one of: {valid_statuses}")
+            
+            elif field_name == 'priority':
+                if field_value is not None:
+                    try:
+                        priority = Priority(field_value)
+                        task.priority = priority
+                    except ValueError:
+                        valid_priorities = [p.value for p in Priority]
+                        raise InvalidPriorityError(f"Invalid priority '{field_value}'. Must be one of: {valid_priorities}")
+            
+            elif field_name == 'due_date':
+                if field_value is not None:
+                    current_date = datetime.now(timezone.utc).date()
+                    if field_value < current_date:
+                        raise PastDueDateError(f"Due date {field_value} cannot be in the past. Current date: {current_date}")
+                    task.due_date = field_value
+            
+            elif field_name == 'estimated_time':
+                if field_value is not None:
+                    if field_value < 0.0:
+                        raise ValueError(f"Estimated time must be non-negative, got: {field_value}")
+                    task.estimated_time = field_value
+            
+            elif field_name == 'labels':
+                # For labels, we update even if field_value is None (from Pydantic validation)
+                # because None means "empty after cleanup" which is a valid update
+                task.labels = field_value
+            
+            elif field_name == 'assignee':
+                # For assignee, we update even if field_value is None (from Pydantic validation)
+                # because None means "empty after cleanup" which is a valid update
+                task.assignee = field_value
+            
+            elif field_name == 'description':
+                # For description, we update even if field_value is None (from Pydantic validation)
+                # because None means "empty after cleanup" which is a valid update
+                task.description = field_value
+        
+        # Persist changes to database
+        db.add(task)
+        db.commit()  # The before_update event will automatically update last_modified
+        db.refresh(task)
+        
+        logger.info(f"Successfully updated task with ID: {task.id}")
+        return task.to_dict()
+        
+    except Exception as e:
+        db.rollback()
+        logger.error(e, exc_info=True)
         raise
 
 
