@@ -59,7 +59,6 @@ class TestTaskFormUI:
              patch('streamlit.date_input') as mock_date_input, \
              patch('streamlit.selectbox') as mock_selectbox, \
              patch('streamlit.multiselect') as mock_multiselect, \
-             patch('streamlit.number_input') as mock_number_input, \
              patch('streamlit.button') as mock_button, \
              patch('streamlit.columns', return_value=[MagicMock(), MagicMock()]) as mock_columns, \
              patch('streamlit.session_state', mock_session_state), \
@@ -69,9 +68,8 @@ class TestTaskFormUI:
             # Mock return values for form widgets
             mock_text_input.side_effect = ["", "", ""]  # title, assignee, description
             mock_date_input.return_value = None
-            mock_selectbox.side_effect = [Priority.MEDIUM.value, Status.TODO.value]  # priority, status
+            mock_selectbox.side_effect = [Priority.MEDIUM.value, Status.TODO.value, 0.5]  # priority, status, estimated_time
             mock_multiselect.return_value = []
-            mock_number_input.return_value = 0.0
             mock_button.return_value = False
             
             # Import and call the function with db parameter
@@ -163,17 +161,18 @@ class TestTaskFormUI:
                     break
             assert multiselect_call_found, "Labels multiselect not found with correct parameters"
             
-            # Verify number input for estimated time - updated to match new range constraints
-            mock_number_input.assert_called_once_with(
-                "Estimated Time (hours)", 
-                min_value=0.5, 
-                max_value=8.0, 
-                step=0.5, 
-                value=0.5,
-                help="Optional field. Estimate the time required to complete the task (0.5 to 8.0 hours).",
-                key="form_data_estimated_time",
-                on_change=mock_number_input.call_args_list[0][1]['on_change']
-            )
+            # Verify estimated_time selectbox with predefined options
+            estimated_time_call_found = False
+            for call_args in mock_selectbox.call_args_list:
+                if call_args[0][0] == "Estimated Time (hours)":
+                    assert call_args[1]['options'] == [0.5, 1.0, 2.0, 4.0, 8.0]
+                    assert call_args[1]['index'] == 0  # Default to 0.5 which is at index 0
+                    assert call_args[1]['help'] == "Optional field. Estimate the time required to complete the task."
+                    assert call_args[1]['key'] == "form_data_estimated_time"
+                    assert callable(call_args[1]['on_change'])
+                    estimated_time_call_found = True
+                    break
+            assert estimated_time_call_found, "Estimated Time selectbox not found with correct parameters"
             
             # Verify submit button
             mock_button.assert_called_once_with("Submit", type="primary")
@@ -186,9 +185,8 @@ class TestTaskFormUI:
         
         with patch('streamlit.text_input', return_value=""), \
              patch('streamlit.date_input', return_value=None), \
-             patch('streamlit.selectbox', side_effect=[Priority.MEDIUM.value, Status.TODO.value]), \
+             patch('streamlit.selectbox', side_effect=[Priority.MEDIUM.value, Status.TODO.value, 0.5]), \
              patch('streamlit.multiselect', return_value=[]), \
-             patch('streamlit.number_input', return_value=0.0), \
              patch('streamlit.button', return_value=False), \
              patch('streamlit.columns', return_value=[MagicMock(), MagicMock()]), \
              patch('streamlit.session_state', mock_session_state), \
@@ -211,7 +209,7 @@ class TestTaskFormUI:
             assert form_data["description"] == ""
             assert form_data["priority"] == Priority.MEDIUM.value
             assert form_data["labels"] == []
-            assert form_data["estimated_time"] == 0.0
+            assert form_data["estimated_time"] == 0.5  # Updated default from 0.0 to 0.5
             assert form_data["status"] == Status.TODO.value
             
             # Verify form_errors is initialized
@@ -229,7 +227,7 @@ class TestTaskFormUI:
             "description": "Existing description",
             "priority": Priority.HIGH.value,
             "labels": ["Bug"],
-            "estimated_time": 2.5,
+            "estimated_time": 2.0,  # Updated to match selectbox option
             "status": Status.IN_PROGRESS.value
         }
         mock_db_session = MagicMock()
@@ -238,7 +236,6 @@ class TestTaskFormUI:
              patch('streamlit.date_input') as mock_date_input, \
              patch('streamlit.selectbox') as mock_selectbox, \
              patch('streamlit.multiselect') as mock_multiselect, \
-             patch('streamlit.number_input') as mock_number_input, \
              patch('streamlit.button', return_value=False), \
              patch('streamlit.columns', return_value=[MagicMock(), MagicMock()]), \
              patch('streamlit.session_state', mock_session_state), \
@@ -248,9 +245,8 @@ class TestTaskFormUI:
             # Mock updated return values
             mock_text_input.side_effect = ["Updated Task", "Jane Smith", "Updated description"]
             mock_date_input.return_value = date(2025, 1, 15)
-            mock_selectbox.side_effect = [Priority.CRITICAL.value, Status.DONE.value]
+            mock_selectbox.side_effect = [Priority.CRITICAL.value, Status.DONE.value, 4.0]  # priority, status, estimated_time
             mock_multiselect.return_value = ["Feature", "Documentation"]
-            mock_number_input.return_value = 5.0
             
             # Import and call the function with db parameter
             from kb_web_svc.components.task_form import render_task_form
@@ -296,18 +292,18 @@ class TestTaskFormUI:
                     break
             assert multiselect_call_found, "Labels multiselect not called with existing values"
             
-            # Updated to handle new number_input parameters with range constraints
-            number_input_call_found = False
-            for call_args in mock_number_input.call_args_list:
+            # Verify estimated_time selectbox with existing value
+            estimated_time_call_found = False
+            for call_args in mock_selectbox.call_args_list:
                 if call_args[0][0] == "Estimated Time (hours)":
-                    assert call_args[1]['min_value'] == 0.5
-                    assert call_args[1]['max_value'] == 8.0
-                    assert call_args[1]['step'] == 0.5
-                    assert call_args[1]['value'] == 2.5
-                    assert call_args[1]['help'] == "Optional field. Estimate the time required to complete the task (0.5 to 8.0 hours)."
-                    number_input_call_found = True
+                    assert call_args[1]['options'] == [0.5, 1.0, 2.0, 4.0, 8.0]
+                    assert call_args[1]['index'] == 2  # 2.0 is at index 2
+                    assert call_args[1]['help'] == "Optional field. Estimate the time required to complete the task."
+                    assert call_args[1]['key'] == "form_data_estimated_time"
+                    assert callable(call_args[1]['on_change'])
+                    estimated_time_call_found = True
                     break
-            assert number_input_call_found, "Estimated Time number input not called with existing values"
+            assert estimated_time_call_found, "Estimated Time selectbox not called with existing values"
             
             # Verify session state is updated with new values
             form_data = mock_session_state.form_data
@@ -317,7 +313,7 @@ class TestTaskFormUI:
             assert form_data["description"] == "Updated description"
             assert form_data["priority"] == Priority.CRITICAL.value
             assert form_data["labels"] == ["Feature", "Documentation"]
-            assert form_data["estimated_time"] == 5.0
+            assert form_data["estimated_time"] == 4.0
             assert form_data["status"] == Status.DONE.value
 
     def test_submit_button_present_and_functional(self):
@@ -327,29 +323,37 @@ class TestTaskFormUI:
         
         with patch('streamlit.text_input', return_value="Test Task"), \
              patch('streamlit.date_input', return_value=None), \
-             patch('streamlit.selectbox', side_effect=[Priority.MEDIUM.value, Status.TODO.value]), \
+             patch('streamlit.selectbox', side_effect=[Priority.MEDIUM.value, Status.TODO.value, 0.5]), \
              patch('streamlit.multiselect', return_value=[]), \
-             patch('streamlit.number_input', return_value=0.0), \
              patch('streamlit.button', return_value=True) as mock_button, \
              patch('streamlit.columns', return_value=[MagicMock(), MagicMock()]), \
              patch('streamlit.session_state', mock_session_state), \
              patch('streamlit.success') as mock_success, \
+             patch('streamlit.error') as mock_error, \
+             patch('streamlit.rerun') as mock_rerun, \
              patch('logging.getLogger'):
             
-            # Import and call the function with db parameter
-            from kb_web_svc.components.task_form import render_task_form
-            render_task_form(mock_db_session)
-            
-            # Verify submit button is called
-            mock_button.assert_called_once_with("Submit", type="primary")
-            
-            # Verify success message is shown when button is clicked
-            mock_success.assert_called_once_with(
-                "Task form submitted successfully! (Backend submission not yet implemented)"
-            )
-            
-            # Verify submission flag is set in session state
-            assert mock_session_state.task_form_submitted is True
+            # Mock backend dependencies
+            with patch('kb_web_svc.components.task_form.create_task') as mock_create_task, \
+                 patch('kb_web_svc.components.task_form.add_task_to_session') as mock_add_task:
+                
+                # Mock successful task creation
+                mock_create_task.return_value = {"id": "test-uuid", "title": "Test Task", "status": "To Do"}
+                
+                # Import and call the function with db parameter
+                from kb_web_svc.components.task_form import render_task_form
+                render_task_form(mock_db_session)
+                
+                # Verify submit button is called
+                mock_button.assert_called_once_with("Submit", type="primary")
+                
+                # Verify success message is shown when button is clicked
+                mock_success.assert_called_once_with("Task created successfully!")
+                
+                # Verify task creation and session update were called
+                mock_create_task.assert_called_once()
+                mock_add_task.assert_called_once()
+                mock_rerun.assert_called_once()
 
     def test_priority_enum_options_displayed_correctly(self):
         """Test that Priority enum options are correctly displayed in selectbox."""
@@ -360,7 +364,6 @@ class TestTaskFormUI:
              patch('streamlit.date_input', return_value=None), \
              patch('streamlit.selectbox') as mock_selectbox, \
              patch('streamlit.multiselect', return_value=[]), \
-             patch('streamlit.number_input', return_value=0.0), \
              patch('streamlit.button', return_value=False), \
              patch('streamlit.columns', return_value=[MagicMock(), MagicMock()]), \
              patch('streamlit.session_state', mock_session_state), \
@@ -368,7 +371,7 @@ class TestTaskFormUI:
              patch('logging.getLogger'):
             
             # Mock selectbox to return specific values
-            mock_selectbox.side_effect = [Priority.HIGH.value, Status.TODO.value]
+            mock_selectbox.side_effect = [Priority.HIGH.value, Status.TODO.value, 0.5]
             
             # Import and call the function with db parameter
             from kb_web_svc.components.task_form import render_task_form
@@ -398,7 +401,6 @@ class TestTaskFormUI:
              patch('streamlit.date_input', return_value=None), \
              patch('streamlit.selectbox') as mock_selectbox, \
              patch('streamlit.multiselect', return_value=[]), \
-             patch('streamlit.number_input', return_value=0.0), \
              patch('streamlit.button', return_value=False), \
              patch('streamlit.columns', return_value=[MagicMock(), MagicMock()]), \
              patch('streamlit.session_state', mock_session_state), \
@@ -406,7 +408,7 @@ class TestTaskFormUI:
              patch('logging.getLogger'):
             
             # Mock selectbox to return specific values
-            mock_selectbox.side_effect = [Priority.MEDIUM.value, Status.IN_PROGRESS.value]
+            mock_selectbox.side_effect = [Priority.MEDIUM.value, Status.IN_PROGRESS.value, 0.5]
             
             # Import and call the function with db parameter
             from kb_web_svc.components.task_form import render_task_form
@@ -467,7 +469,6 @@ class TestTaskFormUI:
              patch('streamlit.date_input', return_value=None), \
              patch('streamlit.selectbox') as mock_selectbox, \
              patch('streamlit.multiselect', return_value=[]), \
-             patch('streamlit.number_input', return_value=0.0), \
              patch('streamlit.button', return_value=False), \
              patch('streamlit.columns', return_value=[MagicMock(), MagicMock()]), \
              patch('streamlit.session_state', mock_session_state), \
@@ -479,8 +480,8 @@ class TestTaskFormUI:
             # We want it to return that same value to preserve it
             mock_text_input.side_effect = ["Existing Title", "", ""]  # title, assignee, description
             
-            # Mock selectbox to return existing priority and default status
-            mock_selectbox.side_effect = [Priority.CRITICAL.value, Status.TODO.value]
+            # Mock selectbox to return existing priority and default status and estimated_time
+            mock_selectbox.side_effect = [Priority.CRITICAL.value, Status.TODO.value, 0.5]
             
             # Import and call the function with db parameter
             from kb_web_svc.components.task_form import render_task_form
@@ -496,7 +497,7 @@ class TestTaskFormUI:
             assert form_data["due_date"] is None
             assert form_data["description"] == ""
             assert form_data["labels"] == []
-            assert form_data["estimated_time"] == 0.0
+            assert form_data["estimated_time"] == 0.5
             assert form_data["status"] == Status.TODO.value
             
             # Verify task_form_data is kept in sync for backward compatibility
@@ -510,13 +511,12 @@ class TestTaskFormUI:
         
         with patch('streamlit.text_input', return_value="Test Task"), \
              patch('streamlit.date_input', return_value=None), \
-             patch('streamlit.selectbox', side_effect=[Priority.MEDIUM.value, Status.TODO.value]), \
+             patch('streamlit.selectbox', side_effect=[Priority.MEDIUM.value, Status.TODO.value, 0.5]), \
              patch('streamlit.multiselect', return_value=[]), \
-             patch('streamlit.number_input', return_value=0.0), \
              patch('streamlit.button', return_value=True), \
              patch('streamlit.columns', return_value=[MagicMock(), MagicMock()]), \
              patch('streamlit.session_state', mock_session_state), \
-             patch('streamlit.success', side_effect=Exception("Submission error")), \
+             patch('streamlit.success'), \
              patch('streamlit.error') as mock_error, \
              patch('logging.getLogger') as mock_get_logger:
             
@@ -524,14 +524,15 @@ class TestTaskFormUI:
             mock_logger = MagicMock()
             mock_get_logger.return_value = mock_logger
             
-            # Import and call the function with db parameter
-            from kb_web_svc.components.task_form import render_task_form
-            render_task_form(mock_db_session)
-            
-            # Verify error was logged
-            mock_logger.error.assert_called()
-            
-            # Verify error message is shown to user
-            mock_error.assert_called_once_with(
-                "An error occurred while submitting the task form. Please try again."
-            )
+            # Mock backend create_task to raise an exception
+            with patch('kb_web_svc.components.task_form.create_task', side_effect=Exception("Backend error")):
+                
+                # Import and call the function with db parameter
+                from kb_web_svc.components.task_form import render_task_form
+                render_task_form(mock_db_session)
+                
+                # Verify error was logged
+                mock_logger.error.assert_called()
+                
+                # Verify error message is shown to user
+                mock_error.assert_called()

@@ -362,7 +362,7 @@ class TestDeleteTask:
             description="This is a detailed task description for testing",
             priority="Critical",
             labels=["testing", "critical", "preserve-data"],
-            estimated_time=12.5,
+            estimated_time=8.0,  # Fixed: changed from 12.5 to 8.0 to comply with validation constraint
             status="In Progress"
         )
         created_task = create_task(task_data, db_session)
@@ -402,6 +402,6 @@ class TestDeleteTask:
         assert db_task_after.description == "This is a detailed task description for testing"
         assert db_task_after.priority == Priority.CRITICAL
         assert db_task_after.labels == ["testing", "critical", "preserve-data"]
-        assert db_task_after.estimated_time == 12.5
+        assert db_task_after.estimated_time == 8.0  # Updated expected value to match fix
         assert db_task_after.status == Status.IN_PROGRESS
         assert db_task_after.created_at == db_task_before.created_at

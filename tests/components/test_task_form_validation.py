@@ -59,9 +59,8 @@ class TestTaskFormValidation:
         
         with patch('streamlit.text_input', return_value=""), \
              patch('streamlit.date_input', return_value=None), \
-             patch('streamlit.selectbox', side_effect=[Priority.MEDIUM.value, Status.TODO.value]), \
+             patch('streamlit.selectbox', side_effect=[Priority.MEDIUM.value, Status.TODO.value, 0.5]), \
              patch('streamlit.multiselect', return_value=[]), \
-             patch('streamlit.number_input', return_value=0.5), \
              patch('streamlit.button', return_value=False), \
              patch('streamlit.columns', return_value=[MagicMock(), MagicMock()]), \
              patch('streamlit.session_state', mock_session_state), \
@@ -306,9 +305,8 @@ class TestTaskFormValidation:
         
         with patch('streamlit.text_input', return_value=""), \
              patch('streamlit.date_input', return_value=None), \
-             patch('streamlit.selectbox', side_effect=[Priority.MEDIUM.value, Status.TODO.value]), \
+             patch('streamlit.selectbox', side_effect=[Priority.MEDIUM.value, Status.TODO.value, 0.5]), \
              patch('streamlit.multiselect', return_value=[]), \
-             patch('streamlit.number_input', return_value=0.5), \
              patch('streamlit.button', return_value=True), \
              patch('streamlit.columns', return_value=[MagicMock(), MagicMock()]), \
              patch('streamlit.error') as mock_error, \
@@ -346,9 +344,8 @@ class TestTaskFormValidation:
         
         with patch('streamlit.text_input', return_value="Valid Title"), \
              patch('streamlit.date_input', return_value=yesterday), \
-             patch('streamlit.selectbox', side_effect=[Priority.MEDIUM.value, Status.TODO.value]), \
+             patch('streamlit.selectbox', side_effect=[Priority.MEDIUM.value, Status.TODO.value, 2.0]), \
              patch('streamlit.multiselect', return_value=[]), \
-             patch('streamlit.number_input', return_value=2.0), \
              patch('streamlit.button', return_value=True), \
              patch('streamlit.columns', return_value=[MagicMock(), MagicMock()]), \
              patch('streamlit.error') as mock_error, \
@@ -383,29 +380,36 @@ class TestTaskFormValidation:
         
         with patch('streamlit.text_input', return_value="Valid Task Title"), \
              patch('streamlit.date_input', return_value=future_date), \
-             patch('streamlit.selectbox', side_effect=[Priority.MEDIUM.value, Status.TODO.value]), \
+             patch('streamlit.selectbox', side_effect=[Priority.MEDIUM.value, Status.TODO.value, 2.5]), \
              patch('streamlit.multiselect', return_value=['Feature']), \
-             patch('streamlit.number_input', return_value=2.5), \
              patch('streamlit.button', return_value=True), \
              patch('streamlit.columns', return_value=[MagicMock(), MagicMock()]), \
              patch('streamlit.error') as mock_error, \
              patch('streamlit.success') as mock_success, \
              patch('streamlit.session_state', mock_session_state), \
+             patch('streamlit.rerun') as mock_rerun, \
              patch('logging.getLogger'):
             
-            # Import and call the function
-            from kb_web_svc.components.task_form import render_task_form
-            render_task_form(mock_db_session)
-            
-            # Verify that success message is displayed
-            mock_success.assert_called_with(
-                "Task form submitted successfully! (Backend submission not yet implemented)"
-            )
-            
-            # Verify submission flag is set
-            assert mock_session_state.task_form_submitted is True
-            
-            # Verify no validation errors are displayed for submission
-            # Should not call error with the submission blocking message
-            error_calls = [call[0][0] for call in mock_error.call_args_list if mock_error.call_args_list]
-            assert "Please correct the errors before submitting." not in error_calls
+            # Mock backend services for successful task creation
+            with patch('kb_web_svc.components.task_form.create_task') as mock_create_task, \
+                 patch('kb_web_svc.components.task_form.add_task_to_session') as mock_add_task:
+                
+                # Mock successful task creation
+                mock_create_task.return_value = {"id": "test-uuid", "title": "Valid Task Title", "status": "To Do"}
+                
+                # Import and call the function
+                from kb_web_svc.components.task_form import render_task_form
+                render_task_form(mock_db_session)
+                
+                # Verify that success message is displayed with backend integration
+                mock_success.assert_called_with("Task created successfully!")
+                
+                # Verify backend create_task was called
+                mock_create_task.assert_called_once()
+                mock_add_task.assert_called_once_with({"id": "test-uuid", "title": "Valid Task Title", "status": "To Do"})
+                mock_rerun.assert_called_once()
+                
+                # Verify no validation errors are displayed for submission
+                # Should not call error with the submission blocking message
+                error_calls = [call[0][0] for call in mock_error.call_args_list if mock_error.call_args_list]
+                assert "Please correct the errors before submitting." not in error_calls
