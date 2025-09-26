@@ -82,7 +82,7 @@ class TestApp:
                 mock_load_tasks.assert_called_once_with(mock_db)
 
     def test_session_state_tasks_by_status_displayed(self):
-        """Test that st.session_state.tasks_by_status is displayed in the UI."""
+        """Test that the task creation form is displayed instead of tasks_by_status JSON."""
         with patch('streamlit.set_page_config'), \
              patch('streamlit.title') as mock_title, \
              patch('streamlit.subheader') as mock_subheader, \
@@ -110,14 +110,14 @@ class TestApp:
                 # Verify UI components were called correctly
                 mock_title.assert_called_once_with("Kanban Board")
                 
-                # Verify both subheader calls are made
-                expected_calls = [call("Current Board State:"), call("Create Task")]
-                mock_subheader.assert_has_calls(expected_calls)
+                # Verify only Create Task subheader is called (board state display removed)
+                mock_subheader.assert_called_once_with("Create Task")
                 
-                mock_json.assert_called_once_with(mock_session_state.tasks_by_status)
+                # Verify JSON display is no longer called (replaced with task form)
+                mock_json.assert_not_called()
                 
-                # Verify task form is rendered
-                mock_render_task_form.assert_called_once()
+                # Verify task form is rendered with database session
+                mock_render_task_form.assert_called_once_with(mock_db)
 
     def test_no_database_connection_test_button(self):
         """Test that the app no longer contains database connection test button."""
@@ -190,7 +190,8 @@ class TestApp:
              patch('kb_web_svc.database.get_db', side_effect=test_exception) as mock_get_db, \
              patch('kb_web_svc.state_management.load_tasks_from_db_to_session') as mock_load_tasks, \
              patch('logging.getLogger') as mock_get_logger, \
-             patch('kb_web_svc.components.task_form.render_task_form'):
+             patch('kb_web_svc.components.task_form.render_task_form'), \
+             patch('streamlit.error'):
             
             # Setup mock logger
             mock_logger = MagicMock()
@@ -225,7 +226,8 @@ class TestApp:
              patch('kb_web_svc.database.get_db') as mock_get_db, \
              patch('kb_web_svc.state_management.load_tasks_from_db_to_session', side_effect=test_exception) as mock_load_tasks, \
              patch('logging.getLogger') as mock_get_logger, \
-             patch('kb_web_svc.components.task_form.render_task_form'):
+             patch('kb_web_svc.components.task_form.render_task_form'), \
+             patch('streamlit.error'):
             
             # Setup get_db to return a generator that yields a mock db session
             mock_db = MagicMock()
@@ -326,7 +328,8 @@ class TestApp:
              patch('kb_web_svc.database.get_db') as mock_get_db, \
              patch('kb_web_svc.state_management.load_tasks_from_db_to_session', side_effect=test_exception), \
              patch('logging.getLogger') as mock_get_logger, \
-             patch('kb_web_svc.components.task_form.render_task_form'):
+             patch('kb_web_svc.components.task_form.render_task_form'), \
+             patch('streamlit.error'):
             
             # Setup get_db to return a generator that yields a mock db session
             mock_db = MagicMock()
