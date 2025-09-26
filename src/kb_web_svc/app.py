@@ -7,8 +7,9 @@ from .database import get_db
 # Import state management functions
 from .state_management import initialize_session_state, load_tasks_from_db_to_session
 
-# Import task form component
+# Import UI components
 from .components.task_form import render_task_form
+from .components.kanban_board import render_kanban_board
 
 # Global configuration (if needed)
 st.set_page_config(page_title="kb_web_svc App", layout="wide")
@@ -21,7 +22,7 @@ def render_ui() -> None:
     """Render the main UI with session state initialization and task loading.
     
     This function initializes the Streamlit session state and loads tasks from the database,
-    then displays the task creation form with database session integration.
+    then displays the kanban board and task creation form with database session integration.
     """
     # Initialize session state first
     initialize_session_state()
@@ -37,6 +38,9 @@ def render_ui() -> None:
         # Display the kanban board UI
         st.title("Kanban Board")
         
+        # Render the kanban board with three columns
+        render_kanban_board()
+        
         # Add task creation form with database session
         st.subheader("Create Task")
         render_task_form(db)
@@ -46,8 +50,15 @@ def render_ui() -> None:
         # Continue rendering UI even if task loading fails
         st.error("An error occurred while loading tasks. Please try again.")
         
-        # Still render the form but without database functionality
+        # Still render the UI components but without full database functionality
         st.title("Kanban Board")
+        
+        # Render kanban board even with error (it will handle empty/failed state)
+        try:
+            render_kanban_board()
+        except Exception as board_error:
+            logger.error(f"Error rendering kanban board: {board_error}", exc_info=True)
+        
         st.subheader("Create Task")
         
         # Create a dummy db session for form rendering when database fails

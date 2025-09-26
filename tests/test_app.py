@@ -30,7 +30,8 @@ class TestApp:
              patch('kb_web_svc.database.get_db') as mock_get_db, \
              patch('kb_web_svc.state_management.load_tasks_from_db_to_session') as mock_load_tasks, \
              patch('logging.getLogger'), \
-             patch('kb_web_svc.components.task_form.render_task_form'):
+             patch('kb_web_svc.components.task_form.render_task_form'), \
+             patch('kb_web_svc.components.kanban_board.render_kanban_board'):
             
             # Setup get_db to return a generator that yields a mock db session
             mock_db = MagicMock()
@@ -59,7 +60,8 @@ class TestApp:
              patch('kb_web_svc.database.get_db') as mock_get_db, \
              patch('kb_web_svc.state_management.load_tasks_from_db_to_session') as mock_load_tasks, \
              patch('logging.getLogger'), \
-             patch('kb_web_svc.components.task_form.render_task_form'):
+             patch('kb_web_svc.components.task_form.render_task_form'), \
+             patch('kb_web_svc.components.kanban_board.render_kanban_board'):
             
             # Setup get_db to return a generator that yields a mock db session
             mock_db = MagicMock()
@@ -91,7 +93,8 @@ class TestApp:
              patch('kb_web_svc.database.get_db') as mock_get_db, \
              patch('kb_web_svc.state_management.load_tasks_from_db_to_session'), \
              patch('logging.getLogger'), \
-             patch('kb_web_svc.components.task_form.render_task_form') as mock_render_task_form:
+             patch('kb_web_svc.components.task_form.render_task_form') as mock_render_task_form, \
+             patch('kb_web_svc.components.kanban_board.render_kanban_board'):
             
             # Setup get_db to return a generator that yields a mock db session
             mock_db = MagicMock()
@@ -130,7 +133,8 @@ class TestApp:
              patch('kb_web_svc.database.get_db') as mock_get_db, \
              patch('kb_web_svc.state_management.load_tasks_from_db_to_session'), \
              patch('logging.getLogger'), \
-             patch('kb_web_svc.components.task_form.render_task_form'):
+             patch('kb_web_svc.components.task_form.render_task_form'), \
+             patch('kb_web_svc.components.kanban_board.render_kanban_board'):
             
             # Setup get_db to return a generator that yields a mock db session
             mock_db = MagicMock()
@@ -159,7 +163,8 @@ class TestApp:
              patch('kb_web_svc.database.get_db') as mock_get_db, \
              patch('kb_web_svc.state_management.load_tasks_from_db_to_session'), \
              patch('logging.getLogger'), \
-             patch('kb_web_svc.components.task_form.render_task_form'):
+             patch('kb_web_svc.components.task_form.render_task_form'), \
+             patch('kb_web_svc.components.kanban_board.render_kanban_board'):
             
             # Setup get_db to return a generator that yields a mock db session
             mock_db = MagicMock()
@@ -191,7 +196,8 @@ class TestApp:
              patch('kb_web_svc.state_management.load_tasks_from_db_to_session') as mock_load_tasks, \
              patch('logging.getLogger') as mock_get_logger, \
              patch('kb_web_svc.components.task_form.render_task_form'), \
-             patch('streamlit.error'):
+             patch('streamlit.error'), \
+             patch('kb_web_svc.components.kanban_board.render_kanban_board') as mock_render_kanban:
             
             # Setup mock logger
             mock_logger = MagicMock()
@@ -213,6 +219,9 @@ class TestApp:
                 
                 # Verify error was logged
                 mock_logger.error.assert_called_once_with(test_exception, exc_info=True)
+                
+                # Verify render_kanban_board was still called in error path
+                mock_render_kanban.assert_called_once()
 
     def test_load_tasks_error_handled_gracefully(self):
         """Test that errors from load_tasks_from_db_to_session are handled gracefully."""
@@ -227,7 +236,8 @@ class TestApp:
              patch('kb_web_svc.state_management.load_tasks_from_db_to_session', side_effect=test_exception) as mock_load_tasks, \
              patch('logging.getLogger') as mock_get_logger, \
              patch('kb_web_svc.components.task_form.render_task_form'), \
-             patch('streamlit.error'):
+             patch('streamlit.error'), \
+             patch('kb_web_svc.components.kanban_board.render_kanban_board') as mock_render_kanban:
             
             # Setup get_db to return a generator that yields a mock db session
             mock_db = MagicMock()
@@ -255,6 +265,9 @@ class TestApp:
                 
                 # Verify error was logged
                 mock_logger.error.assert_called_once_with(test_exception, exc_info=True)
+                
+                # Verify render_kanban_board was still called in error path
+                mock_render_kanban.assert_called_once()
 
     def test_render_ui_function_exists_and_callable(self):
         """Test that render_ui function exists and is callable after import."""
@@ -266,7 +279,8 @@ class TestApp:
              patch('kb_web_svc.database.get_db') as mock_get_db, \
              patch('kb_web_svc.state_management.load_tasks_from_db_to_session'), \
              patch('logging.getLogger'), \
-             patch('kb_web_svc.components.task_form.render_task_form'):
+             patch('kb_web_svc.components.task_form.render_task_form'), \
+             patch('kb_web_svc.components.kanban_board.render_kanban_board'):
             
             # Setup get_db to return a generator that yields a mock db session
             mock_db = MagicMock()
@@ -296,7 +310,8 @@ class TestApp:
              patch('kb_web_svc.database.get_db') as mock_get_db, \
              patch('kb_web_svc.state_management.load_tasks_from_db_to_session'), \
              patch('logging.getLogger'), \
-             patch('kb_web_svc.components.task_form.render_task_form'):
+             patch('kb_web_svc.components.task_form.render_task_form'), \
+             patch('kb_web_svc.components.kanban_board.render_kanban_board'):
             
             # Setup get_db to return a generator that yields a mock db session
             mock_db = MagicMock()
@@ -329,7 +344,8 @@ class TestApp:
              patch('kb_web_svc.state_management.load_tasks_from_db_to_session', side_effect=test_exception), \
              patch('logging.getLogger') as mock_get_logger, \
              patch('kb_web_svc.components.task_form.render_task_form'), \
-             patch('streamlit.error'):
+             patch('streamlit.error'), \
+             patch('kb_web_svc.components.kanban_board.render_kanban_board'):
             
             # Setup get_db to return a generator that yields a mock db session
             mock_db = MagicMock()
@@ -355,3 +371,33 @@ class TestApp:
                 
                 # Verify error was logged
                 mock_logger.error.assert_called_once_with(test_exception, exc_info=True)
+
+    def test_kanban_board_rendered_on_app_load(self):
+        """Test that render_kanban_board is called when app.py is loaded."""
+        with patch('streamlit.set_page_config'), \
+             patch('streamlit.title'), \
+             patch('streamlit.subheader'), \
+             patch('streamlit.json'), \
+             patch('kb_web_svc.state_management.initialize_session_state'), \
+             patch('kb_web_svc.database.get_db') as mock_get_db, \
+             patch('kb_web_svc.state_management.load_tasks_from_db_to_session'), \
+             patch('logging.getLogger'), \
+             patch('kb_web_svc.components.task_form.render_task_form'), \
+             patch('kb_web_svc.components.kanban_board.render_kanban_board') as mock_render_kanban:
+            
+            # Setup get_db to return a generator that yields a mock db session
+            mock_db = MagicMock()
+            mock_db_gen = MagicMock()
+            mock_db_gen.__next__ = MagicMock(side_effect=[mock_db, StopIteration()])
+            mock_get_db.return_value = mock_db_gen
+            
+            # Mock streamlit session state directly
+            mock_session_state = MagicMock()
+            mock_session_state.tasks_by_status = {"To Do": [], "In Progress": [], "Done": []}
+            
+            with patch('streamlit.session_state', mock_session_state):
+                # Import the app module after all patches are in place
+                import kb_web_svc.app
+                
+                # Verify render_kanban_board was called once
+                mock_render_kanban.assert_called_once()
