@@ -7,6 +7,9 @@ from .database import get_db
 # Import state management functions
 from .state_management import initialize_session_state, load_tasks_from_db_to_session
 
+# Import task form component
+from .components.task_form import render_task_form
+
 # Global configuration (if needed)
 st.set_page_config(page_title="kb_web_svc App", layout="wide")
 
@@ -18,7 +21,7 @@ def render_ui() -> None:
     """Render the main UI with session state initialization and task loading.
     
     This function initializes the Streamlit session state and loads tasks from the database,
-    then displays the current board state for verification.
+    then displays the current board state for verification and renders the task creation form.
     """
     # Initialize session state first
     initialize_session_state()
@@ -49,6 +52,10 @@ def render_ui() -> None:
     # Temporary UI component to display the loaded session state for verification
     st.subheader("Current Board State:")
     st.json(st.session_state.tasks_by_status)
+    
+    # Add task creation form
+    st.subheader("Create Task")
+    render_task_form()
 
 
 # Render the main UI

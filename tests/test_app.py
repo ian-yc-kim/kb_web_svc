@@ -29,7 +29,8 @@ class TestApp:
              patch('kb_web_svc.state_management.initialize_session_state') as mock_init, \
              patch('kb_web_svc.database.get_db') as mock_get_db, \
              patch('kb_web_svc.state_management.load_tasks_from_db_to_session') as mock_load_tasks, \
-             patch('logging.getLogger'):
+             patch('logging.getLogger'), \
+             patch('kb_web_svc.components.task_form.render_task_form'):
             
             # Setup get_db to return a generator that yields a mock db session
             mock_db = MagicMock()
@@ -57,7 +58,8 @@ class TestApp:
              patch('kb_web_svc.state_management.initialize_session_state'), \
              patch('kb_web_svc.database.get_db') as mock_get_db, \
              patch('kb_web_svc.state_management.load_tasks_from_db_to_session') as mock_load_tasks, \
-             patch('logging.getLogger'):
+             patch('logging.getLogger'), \
+             patch('kb_web_svc.components.task_form.render_task_form'):
             
             # Setup get_db to return a generator that yields a mock db session
             mock_db = MagicMock()
@@ -88,7 +90,8 @@ class TestApp:
              patch('kb_web_svc.state_management.initialize_session_state'), \
              patch('kb_web_svc.database.get_db') as mock_get_db, \
              patch('kb_web_svc.state_management.load_tasks_from_db_to_session'), \
-             patch('logging.getLogger'):
+             patch('logging.getLogger'), \
+             patch('kb_web_svc.components.task_form.render_task_form') as mock_render_task_form:
             
             # Setup get_db to return a generator that yields a mock db session
             mock_db = MagicMock()
@@ -106,8 +109,15 @@ class TestApp:
                 
                 # Verify UI components were called correctly
                 mock_title.assert_called_once_with("Kanban Board")
-                mock_subheader.assert_called_once_with("Current Board State:")
+                
+                # Verify both subheader calls are made
+                expected_calls = [call("Current Board State:"), call("Create Task")]
+                mock_subheader.assert_has_calls(expected_calls)
+                
                 mock_json.assert_called_once_with(mock_session_state.tasks_by_status)
+                
+                # Verify task form is rendered
+                mock_render_task_form.assert_called_once()
 
     def test_no_database_connection_test_button(self):
         """Test that the app no longer contains database connection test button."""
@@ -119,7 +129,8 @@ class TestApp:
              patch('kb_web_svc.state_management.initialize_session_state'), \
              patch('kb_web_svc.database.get_db') as mock_get_db, \
              patch('kb_web_svc.state_management.load_tasks_from_db_to_session'), \
-             patch('logging.getLogger'):
+             patch('logging.getLogger'), \
+             patch('kb_web_svc.components.task_form.render_task_form'):
             
             # Setup get_db to return a generator that yields a mock db session
             mock_db = MagicMock()
@@ -147,7 +158,8 @@ class TestApp:
              patch('kb_web_svc.state_management.initialize_session_state'), \
              patch('kb_web_svc.database.get_db') as mock_get_db, \
              patch('kb_web_svc.state_management.load_tasks_from_db_to_session'), \
-             patch('logging.getLogger'):
+             patch('logging.getLogger'), \
+             patch('kb_web_svc.components.task_form.render_task_form'):
             
             # Setup get_db to return a generator that yields a mock db session
             mock_db = MagicMock()
@@ -177,7 +189,8 @@ class TestApp:
              patch('kb_web_svc.state_management.initialize_session_state'), \
              patch('kb_web_svc.database.get_db', side_effect=test_exception) as mock_get_db, \
              patch('kb_web_svc.state_management.load_tasks_from_db_to_session') as mock_load_tasks, \
-             patch('logging.getLogger') as mock_get_logger:
+             patch('logging.getLogger') as mock_get_logger, \
+             patch('kb_web_svc.components.task_form.render_task_form'):
             
             # Setup mock logger
             mock_logger = MagicMock()
@@ -211,7 +224,8 @@ class TestApp:
              patch('kb_web_svc.state_management.initialize_session_state'), \
              patch('kb_web_svc.database.get_db') as mock_get_db, \
              patch('kb_web_svc.state_management.load_tasks_from_db_to_session', side_effect=test_exception) as mock_load_tasks, \
-             patch('logging.getLogger') as mock_get_logger:
+             patch('logging.getLogger') as mock_get_logger, \
+             patch('kb_web_svc.components.task_form.render_task_form'):
             
             # Setup get_db to return a generator that yields a mock db session
             mock_db = MagicMock()
@@ -249,7 +263,8 @@ class TestApp:
              patch('kb_web_svc.state_management.initialize_session_state'), \
              patch('kb_web_svc.database.get_db') as mock_get_db, \
              patch('kb_web_svc.state_management.load_tasks_from_db_to_session'), \
-             patch('logging.getLogger'):
+             patch('logging.getLogger'), \
+             patch('kb_web_svc.components.task_form.render_task_form'):
             
             # Setup get_db to return a generator that yields a mock db session
             mock_db = MagicMock()
@@ -278,7 +293,8 @@ class TestApp:
              patch('kb_web_svc.state_management.initialize_session_state'), \
              patch('kb_web_svc.database.get_db') as mock_get_db, \
              patch('kb_web_svc.state_management.load_tasks_from_db_to_session'), \
-             patch('logging.getLogger'):
+             patch('logging.getLogger'), \
+             patch('kb_web_svc.components.task_form.render_task_form'):
             
             # Setup get_db to return a generator that yields a mock db session
             mock_db = MagicMock()
@@ -309,7 +325,8 @@ class TestApp:
              patch('kb_web_svc.state_management.initialize_session_state'), \
              patch('kb_web_svc.database.get_db') as mock_get_db, \
              patch('kb_web_svc.state_management.load_tasks_from_db_to_session', side_effect=test_exception), \
-             patch('logging.getLogger') as mock_get_logger:
+             patch('logging.getLogger') as mock_get_logger, \
+             patch('kb_web_svc.components.task_form.render_task_form'):
             
             # Setup get_db to return a generator that yields a mock db session
             mock_db = MagicMock()
