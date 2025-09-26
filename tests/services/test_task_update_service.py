@@ -76,7 +76,7 @@ class TestUpdateTask:
 
     def test_update_task_all_fields_success(self, db_session: Session):
         """Test successful update of all task fields."""
-        # Create initial task
+        # Create initial task with "In Progress" status to allow valid transition to "Done"
         initial_task_data = TaskCreate(
             title="Original title",
             assignee="Original assignee",
@@ -85,7 +85,7 @@ class TestUpdateTask:
             priority="Low",
             labels=["original", "labels"],
             estimated_time=5.0,
-            status="To Do"
+            status="In Progress"  # Changed to allow valid transition to "Done"
         )
         created_task = create_task(initial_task_data, db_session)
         task_id = uuid.UUID(created_task['id'])
@@ -100,7 +100,7 @@ class TestUpdateTask:
             priority="Critical",
             labels=["updated", "labels", "test"],
             estimated_time=12.5,
-            status="Done"
+            status="Done"  # Valid transition: In Progress -> Done
         )
         
         # Update task

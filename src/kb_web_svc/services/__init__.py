@@ -12,7 +12,8 @@ from .task_service import (
     InvalidPriorityError, 
     PastDueDateError,
     TaskNotFoundError,
-    OptimisticConcurrencyError
+    OptimisticConcurrencyError,
+    InvalidStatusTransitionError
 )
 
 __all__ = [
@@ -23,5 +24,6 @@ __all__ = [
     "InvalidPriorityError", 
     "PastDueDateError",
     "TaskNotFoundError",
-    "OptimisticConcurrencyError"
+    "OptimisticConcurrencyError",
+    "InvalidStatusTransitionError"
 ]

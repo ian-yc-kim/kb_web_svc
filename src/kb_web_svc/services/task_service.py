@@ -43,6 +43,11 @@ class OptimisticConcurrencyError(ValueError):
     pass
 
 
+class InvalidStatusTransitionError(ValueError):
+    """Exception raised when an invalid status transition is attempted."""
+    pass
+
+
 def create_task(payload: TaskCreate, db: Session) -> Dict[str, Any]:
     """Create a new task with validation and database persistence.
     
@@ -147,6 +152,8 @@ def update_task(task_id: UUID, payload: TaskUpdate, db: Session) -> Dict[str, An
                                         indicating concurrency conflict by another user
     @raises InvalidStatusError: When the provided status value is invalid and not a valid Status 
                                 enum value (must be 'To Do', 'In Progress', or 'Done')
+    @raises InvalidStatusTransitionError: When the status transition is not allowed according 
+                                          to the defined transition rules
     @raises InvalidPriorityError: When the provided priority value is invalid and not a valid 
                                   Priority enum value (must be 'Critical', 'High', 
                                   'Medium', or 'Low')
@@ -156,6 +163,13 @@ def update_task(task_id: UUID, payload: TaskUpdate, db: Session) -> Dict[str, An
                         trimming whitespace, or other validation constraints are violated
     """
     logger.info(f"Updating task with ID: {task_id}")
+    
+    # Define allowed status transitions
+    allowed_transitions = {
+        Status.TODO: {Status.IN_PROGRESS},
+        Status.IN_PROGRESS: {Status.DONE, Status.TODO},
+        Status.DONE: {Status.IN_PROGRESS, Status.TODO}
+    }
     
     try:
         # Fetch the existing task
@@ -199,11 +213,24 @@ def update_task(task_id: UUID, payload: TaskUpdate, db: Session) -> Dict[str, An
             elif field_name == 'status':
                 if field_value is not None:
                     try:
-                        status = Status(field_value)
-                        task.status = status
+                        new_status = Status(field_value)
                     except ValueError:
                         valid_statuses = [s.value for s in Status]
                         raise InvalidStatusError(f"Invalid status '{field_value}'. Must be one of: {valid_statuses}")
+                    
+                    # Validate status transition if status is actually changing
+                    current_status = task.status
+                    if new_status != current_status:
+                        if new_status not in allowed_transitions[current_status]:
+                            current_status_value = current_status.value
+                            new_status_value = new_status.value
+                            allowed_statuses = [s.value for s in allowed_transitions[current_status]]
+                            raise InvalidStatusTransitionError(
+                                f"Invalid status transition from '{current_status_value}' to '{new_status_value}'. "
+                                f"Allowed transitions from '{current_status_value}' are: {allowed_statuses}"
+                            )
+                    
+                    task.status = new_status
             
             elif field_name == 'priority':
                 if field_value is not None:
