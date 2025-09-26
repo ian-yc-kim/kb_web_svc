@@ -57,7 +57,6 @@ def create_task(payload: TaskCreate, db: Session) -> Dict[str, Any]:
         InvalidStatusError: When status is not a valid Status enum value
         InvalidPriorityError: When priority is not a valid Priority enum value
         PastDueDateError: When due_date is in the past
-        ValueError: When estimated_time is negative or other validation errors
     """
     logger.info(f"Creating task with title: {payload.title}")
     
@@ -89,10 +88,8 @@ def create_task(payload: TaskCreate, db: Session) -> Dict[str, Any]:
         if due_date < current_date:
             raise PastDueDateError(f"Due date {due_date} cannot be in the past. Current date: {current_date}")
     
-    # Validate estimated_time is non-negative if provided
+    # Get estimated_time from payload (Pydantic already validated range constraints)
     estimated_time = payload.estimated_time
-    if estimated_time is not None and estimated_time < 0.0:
-        raise ValueError(f"Estimated time must be non-negative, got: {estimated_time}")
     
     # Process labels - convert None to None (to_dict will handle as [])
     labels = payload.labels

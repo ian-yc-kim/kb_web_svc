@@ -37,7 +37,7 @@ class TestCreateTask:
             description="Write comprehensive documentation for the project",
             priority="High",
             labels=["documentation", "high-priority"],
-            estimated_time=8.5,
+            estimated_time=8.0,  # Updated to valid upper bound
             status="In Progress"
         )
         
@@ -56,7 +56,7 @@ class TestCreateTask:
         assert result['description'] == "Write comprehensive documentation for the project"
         assert result['priority'] == "High"
         assert result['labels'] == ["documentation", "high-priority"]
-        assert result['estimated_time'] == 8.5
+        assert result['estimated_time'] == 8.0  # Updated expected value
         assert result['status'] == "In Progress"
         assert 'created_at' in result
         assert 'last_modified' in result
@@ -260,13 +260,19 @@ class TestCreateTask:
         assert errors[0]['loc'] == ('due_date',)
         # Pydantic should reject this as not a valid date
 
-    def test_create_task_negative_estimated_time_validation_error(self):
-        """Test that negative estimated_time raises Pydantic ValidationError."""
-        # Try to create TaskCreate with negative estimated_time
+    @pytest.mark.parametrize("estimated_time,expected_error_type", [
+        (0.0, "greater_than_equal"),
+        (0.4, "greater_than_equal"),
+        (8.1, "less_than_equal"),
+        (-1.0, "greater_than_equal"),
+    ])
+    def test_create_task_estimated_time_range_validation_error(self, estimated_time, expected_error_type):
+        """Test that estimated_time outside [0.5, 8.0] range raises Pydantic ValidationError."""
+        # Try to create TaskCreate with out-of-range estimated_time
         with pytest.raises(ValidationError) as exc_info:
             TaskCreate(
                 title="Test task",
-                estimated_time=-1.0,  # Negative time
+                estimated_time=estimated_time,
                 status="To Do"
             )
         
@@ -274,35 +280,31 @@ class TestCreateTask:
         errors = exc_info.value.errors()
         assert len(errors) == 1
         assert errors[0]['loc'] == ('estimated_time',)
-        assert errors[0]['type'] == 'greater_than_equal'
+        assert errors[0]['type'] == expected_error_type
 
-    def test_create_task_negative_estimated_time_service_error(self, db_session: Session):
-        """Test that negative estimated_time in service raises ValueError."""
-        # Create task data with negative estimated time
-        # (bypassing Pydantic validation by creating manually)
+    @pytest.mark.parametrize("estimated_time", [0.5, 4.0, 8.0])
+    def test_create_task_estimated_time_valid_range_success(self, db_session: Session, estimated_time):
+        """Test that valid estimated_time values within [0.5, 8.0] range succeed."""
+        # Create task data with valid estimated_time
         task_data = TaskCreate(
-            title="Test task",
-            estimated_time=0.0,  # Valid for Pydantic
+            title="Valid estimated time task",
+            estimated_time=estimated_time,
             status="To Do"
         )
-        # Manually set negative value to test service validation
-        task_data.estimated_time = -5.0
         
-        # Count initial tasks in database
-        initial_count = db_session.query(Task).count()
+        # Create task - should succeed
+        result = create_task(task_data, db_session)
         
-        # Try to create task - should raise ValueError
-        with pytest.raises(ValueError) as exc_info:
-            create_task(task_data, db_session)
+        # Verify task creation succeeded
+        assert result['estimated_time'] == estimated_time
+        assert result['title'] == "Valid estimated time task"
+        assert result['status'] == "To Do"
         
-        # Verify error message
-        error_msg = str(exc_info.value)
-        assert "Estimated time must be non-negative" in error_msg
-        assert "-5.0" in error_msg
-        
-        # Verify transaction was rolled back - no new task created
-        final_count = db_session.query(Task).count()
-        assert final_count == initial_count
+        # Verify task is persisted in database
+        task_id = uuid.UUID(result['id'])
+        db_task = db_session.get(Task, task_id)
+        assert db_task is not None
+        assert db_task.estimated_time == estimated_time
 
     def test_create_task_empty_labels_list_success(self, db_session: Session):
         """Test that empty labels list works correctly."""

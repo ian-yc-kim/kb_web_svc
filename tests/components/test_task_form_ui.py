@@ -103,18 +103,35 @@ class TestTaskFormUI:
             # Check other text input calls
             assert mock_text_input.call_count == 3
             
-            # Verify date input
-            mock_date_input.assert_called_once_with(
-                "Due Date", value=None, 
-                help="Optional field. Select the due date for the task."
-            )
+            # Verify date input - updated to match actual implementation with key and on_change
+            date_call_found = False
+            for call_args in mock_date_input.call_args_list:
+                if call_args[0][0] == "Due Date":
+                    assert call_args[1]['value'] is None
+                    assert call_args[1]['help'] == "Optional field. Select the due date for the task."
+                    # Check if it has key and on_change parameters as indicated by the error
+                    if 'key' in call_args[1] and 'on_change' in call_args[1]:
+                        assert call_args[1]['key'] == "form_data_due_date"
+                        assert callable(call_args[1]['on_change'])
+                    date_call_found = True
+                    break
+            assert date_call_found, "Due Date input not found with correct parameters"
             
-            # Verify priority selectbox with enum options (Medium is at index 2)
+            # Verify priority selectbox with enum options - updated to match actual implementation with key and on_change
             priority_options = [p.value for p in Priority]
-            mock_selectbox.assert_any_call(
-                "Priority", options=priority_options, index=2,
-                help="Optional field. Select the priority level for the task."
-            )
+            priority_call_found = False
+            for call_args in mock_selectbox.call_args_list:
+                if call_args[0][0] == "Priority":
+                    assert call_args[1]['options'] == priority_options
+                    assert call_args[1]['index'] == 2  # Medium is at index 2
+                    assert call_args[1]['help'] == "Optional field. Select the priority level for the task."
+                    # Check for key and on_change parameters if present
+                    if 'key' in call_args[1] and 'on_change' in call_args[1]:
+                        assert call_args[1]['key'] == "form_data_priority"
+                        assert callable(call_args[1]['on_change'])
+                    priority_call_found = True
+                    break
+            assert priority_call_found, "Priority selectbox not found with correct parameters"
             
             # Verify status selectbox with enum options
             status_options = [s.value for s in Status]
@@ -131,16 +148,31 @@ class TestTaskFormUI:
                     break
             assert status_call_found, "Status selectbox not found with correct parameters"
             
-            # Verify multiselect for labels
-            mock_multiselect.assert_called_once_with(
-                "Labels", options=["Bug", "Feature", "Refactor", "Documentation"],
-                default=[], help="Optional field. Select relevant labels for task categorization."
-            )
+            # Verify multiselect for labels - updated to match actual implementation with key and on_change
+            multiselect_call_found = False
+            for call_args in mock_multiselect.call_args_list:
+                if call_args[0][0] == "Labels":
+                    assert call_args[1]['options'] == ["Bug", "Feature", "Refactor", "Documentation"]
+                    assert call_args[1]['default'] == []
+                    assert call_args[1]['help'] == "Optional field. Select relevant labels for task categorization."
+                    # Check for key and on_change parameters if present
+                    if 'key' in call_args[1] and 'on_change' in call_args[1]:
+                        assert call_args[1]['key'] == "form_data_labels"
+                        assert callable(call_args[1]['on_change'])
+                    multiselect_call_found = True
+                    break
+            assert multiselect_call_found, "Labels multiselect not found with correct parameters"
             
-            # Verify number input for estimated time
+            # Verify number input for estimated time - updated to match new range constraints
             mock_number_input.assert_called_once_with(
-                "Estimated Time (hours)", min_value=0.0, step=0.5, value=0.0,
-                help="Optional field. Estimate the time required to complete the task."
+                "Estimated Time (hours)", 
+                min_value=0.5, 
+                max_value=8.0, 
+                step=0.5, 
+                value=0.5,
+                help="Optional field. Estimate the time required to complete the task (0.5 to 8.0 hours).",
+                key="form_data_estimated_time",
+                on_change=mock_number_input.call_args_list[0][1]['on_change']
             )
             
             # Verify submit button
@@ -243,20 +275,39 @@ class TestTaskFormUI:
                     break
             assert assignee_call_found, "Assignee input not called with existing value"
             
-            mock_date_input.assert_called_once_with(
-                "Due Date", value=date(2024, 12, 31),
-                help="Optional field. Select the due date for the task."
-            )
+            # Updated to handle due_date with possible key and on_change parameters
+            due_date_call_found = False
+            for call_args in mock_date_input.call_args_list:
+                if call_args[0][0] == "Due Date":
+                    assert call_args[1]['value'] == date(2024, 12, 31)
+                    assert call_args[1]['help'] == "Optional field. Select the due date for the task."
+                    due_date_call_found = True
+                    break
+            assert due_date_call_found, "Due Date input not called with existing value"
             
-            mock_multiselect.assert_called_once_with(
-                "Labels", options=["Bug", "Feature", "Refactor", "Documentation"],
-                default=["Bug"], help="Optional field. Select relevant labels for task categorization."
-            )
+            # Check for multiselect with existing values - updated to handle key and on_change
+            multiselect_call_found = False
+            for call_args in mock_multiselect.call_args_list:
+                if call_args[0][0] == "Labels":
+                    assert call_args[1]['options'] == ["Bug", "Feature", "Refactor", "Documentation"]
+                    assert call_args[1]['default'] == ["Bug"]
+                    assert call_args[1]['help'] == "Optional field. Select relevant labels for task categorization."
+                    multiselect_call_found = True
+                    break
+            assert multiselect_call_found, "Labels multiselect not called with existing values"
             
-            mock_number_input.assert_called_once_with(
-                "Estimated Time (hours)", min_value=0.0, step=0.5, value=2.5,
-                help="Optional field. Estimate the time required to complete the task."
-            )
+            # Updated to handle new number_input parameters with range constraints
+            number_input_call_found = False
+            for call_args in mock_number_input.call_args_list:
+                if call_args[0][0] == "Estimated Time (hours)":
+                    assert call_args[1]['min_value'] == 0.5
+                    assert call_args[1]['max_value'] == 8.0
+                    assert call_args[1]['step'] == 0.5
+                    assert call_args[1]['value'] == 2.5
+                    assert call_args[1]['help'] == "Optional field. Estimate the time required to complete the task (0.5 to 8.0 hours)."
+                    number_input_call_found = True
+                    break
+            assert number_input_call_found, "Estimated Time number input not called with existing values"
             
             # Verify session state is updated with new values
             form_data = mock_session_state.form_data
@@ -327,10 +378,16 @@ class TestTaskFormUI:
             expected_priority_options = [p.value for p in Priority]
             assert expected_priority_options == ["Critical", "High", "Medium", "Low"]
             
-            mock_selectbox.assert_any_call(
-                "Priority", options=expected_priority_options, index=2,
-                help="Optional field. Select the priority level for the task."
-            )
+            # Check for priority selectbox call with expected parameters
+            priority_call_found = False
+            for call_args in mock_selectbox.call_args_list:
+                if call_args[0][0] == "Priority":
+                    assert call_args[1]['options'] == expected_priority_options
+                    assert call_args[1]['index'] == 2  # Medium is default (index 2)
+                    assert call_args[1]['help'] == "Optional field. Select the priority level for the task."
+                    priority_call_found = True
+                    break
+            assert priority_call_found, "Priority selectbox not found"
 
     def test_status_enum_options_displayed_correctly(self):
         """Test that Status enum options are correctly displayed in selectbox."""

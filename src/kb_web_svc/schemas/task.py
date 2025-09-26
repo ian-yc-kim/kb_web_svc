@@ -24,7 +24,7 @@ class TaskCreate(BaseModel):
     description: Optional[str] = Field(None, description="Detailed task description")
     priority: Optional[str] = Field(None, description="Task priority level")
     labels: Optional[List[str]] = Field(None, description="List of task labels")
-    estimated_time: Optional[float] = Field(None, ge=0.0, description="Estimated time in hours")
+    estimated_time: Optional[float] = Field(None, ge=0.5, le=8.0, description="Estimated time in hours (0.5–8.0)")
     status: str = Field(..., description="Task status (required)")
     
     @field_validator('title')
