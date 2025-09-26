@@ -324,42 +324,148 @@ class TestTaskFormValidation:
             mock_success.assert_not_called()
 
     def test_submission_blocked_when_any_new_validation_fails(self):
-        """Test that submission is blocked when any of the new validation fields fail."""
+        """Test that submission is blocked when backend validation fails with InvalidPriorityError."""
         mock_session_state = MockSessionState()
         mock_db_session = MagicMock()
         
-        # Test with invalid due_date
-        yesterday = date.today() - timedelta(days=1)
+        # Test with valid form_data (no client-side errors)
+        future_date = date.today() + timedelta(days=7)
         mock_session_state.form_data = {
             'title': 'Valid Title',
             'status': Status.TODO.value,
-            'assignee': '',
-            'due_date': yesterday,  # Invalid: past date
-            'description': '',
-            'priority': Priority.MEDIUM.value,
-            'labels': [],
+            'assignee': 'John Doe',
+            'due_date': future_date,
+            'description': 'Valid description',
+            'priority': Priority.MEDIUM.value,  # Client-side valid but backend will fail
+            'labels': ['Feature'],
             'estimated_time': 2.0
         }
         mock_session_state.form_errors = {}
         
-        with patch('streamlit.text_input', return_value="Valid Title"), \
-             patch('streamlit.date_input', return_value=yesterday), \
+        with patch('streamlit.text_input', side_effect=["Valid Title", "John Doe", "Valid description"]), \
+             patch('streamlit.date_input', return_value=future_date), \
              patch('streamlit.selectbox', side_effect=[Priority.MEDIUM.value, Status.TODO.value, 2.0]), \
-             patch('streamlit.multiselect', return_value=[]), \
+             patch('streamlit.multiselect', return_value=['Feature']), \
              patch('streamlit.button', return_value=True), \
              patch('streamlit.columns', return_value=[MagicMock(), MagicMock()]), \
              patch('streamlit.error') as mock_error, \
              patch('streamlit.success') as mock_success, \
              patch('streamlit.session_state', mock_session_state), \
+             patch('streamlit.rerun') as mock_rerun, \
              patch('logging.getLogger'):
             
-            # Import and call the function
-            from kb_web_svc.components.task_form import render_task_form
-            render_task_form(mock_db_session)
+            # Mock backend services to fail
+            with patch('kb_web_svc.components.task_form.create_task') as mock_create_task, \
+                 patch('kb_web_svc.components.task_form.add_task_to_session') as mock_add_task:
+                
+                # Mock create_task to raise InvalidPriorityError
+                from kb_web_svc.services.task_service import InvalidPriorityError
+                mock_create_task.side_effect = InvalidPriorityError("Invalid priority 'X'. Must be one of: ['Critical', 'High', 'Medium', 'Low']")
+                
+                # Import and call the function
+                from kb_web_svc.components.task_form import render_task_form
+                render_task_form(mock_db_session)
+                
+                # Verify that backend error is displayed with correct prefix
+                mock_error.assert_any_call("Invalid priority: Invalid priority 'X'. Must be one of: ['Critical', 'High', 'Medium', 'Low']")
+                
+                # Verify success is not called and rerun is not called
+                mock_success.assert_not_called()
+                mock_rerun.assert_not_called()
+                
+                # Verify add_task_to_session is not called
+                mock_add_task.assert_not_called()
+                
+                # Verify form_data is NOT reset (unchanged from initial values)
+                assert mock_session_state.form_data['title'] == 'Valid Title'
+                assert mock_session_state.form_data['assignee'] == 'John Doe'
+                assert mock_session_state.form_data['priority'] == Priority.MEDIUM.value
+
+    @pytest.mark.parametrize("exception_class, exception_message, expected_error_prefix", [
+        (
+            "InvalidStatusError",
+            "Invalid status 'Invalid'. Must be one of: ['To Do', 'In Progress', 'Done']",
+            "Invalid status:"
+        ),
+        (
+            "PastDueDateError",
+            "Due date 2023-01-01 cannot be in the past. Current date: 2024-01-01",
+            "Invalid due date:"
+        )
+    ])
+    def test_form_submission_handles_backend_errors(self, exception_class, exception_message, expected_error_prefix):
+        """Test that form submission handles backend errors correctly and preserves form data."""
+        mock_session_state = MockSessionState()
+        mock_db_session = MagicMock()
+        
+        # Set up valid form_data (no client-side validation errors)
+        future_date = date.today() + timedelta(days=7)
+        original_form_data = {
+            'title': 'Valid Task Title',
+            'status': Status.TODO.value,
+            'assignee': 'John Doe',
+            'due_date': future_date,
+            'description': 'Task description',
+            'priority': Priority.HIGH.value,
+            'labels': ['Feature', 'Bug'],
+            'estimated_time': 4.0
+        }
+        mock_session_state.form_data = original_form_data.copy()
+        mock_session_state.form_errors = {}
+        
+        with patch('streamlit.text_input', side_effect=["Valid Task Title", "John Doe", "Task description"]), \
+             patch('streamlit.date_input', return_value=future_date), \
+             patch('streamlit.selectbox', side_effect=[Priority.HIGH.value, Status.TODO.value, 4.0]), \
+             patch('streamlit.multiselect', return_value=['Feature', 'Bug']), \
+             patch('streamlit.button', return_value=True), \
+             patch('streamlit.columns', return_value=[MagicMock(), MagicMock()]), \
+             patch('streamlit.error') as mock_error, \
+             patch('streamlit.success') as mock_success, \
+             patch('streamlit.session_state', mock_session_state), \
+             patch('streamlit.rerun') as mock_rerun, \
+             patch('logging.getLogger'):
             
-            # Verify that submission is blocked and correct error message is shown
-            mock_error.assert_any_call("Please correct the errors before submitting.")
-            mock_success.assert_not_called()
+            # Mock backend services
+            with patch('kb_web_svc.components.task_form.create_task') as mock_create_task, \
+                 patch('kb_web_svc.components.task_form.add_task_to_session') as mock_add_task:
+                
+                # Import the specific exception class dynamically
+                from kb_web_svc.services.task_service import InvalidStatusError, PastDueDateError
+                exception_map = {
+                    "InvalidStatusError": InvalidStatusError,
+                    "PastDueDateError": PastDueDateError
+                }
+                
+                # Mock create_task to raise the parametrized exception
+                mock_create_task.side_effect = exception_map[exception_class](exception_message)
+                
+                # Import and call the function
+                from kb_web_svc.components.task_form import render_task_form
+                render_task_form(mock_db_session)
+                
+                # Verify that error is displayed with correct prefix
+                expected_full_message = f"{expected_error_prefix} {exception_message}"
+                mock_error.assert_any_call(expected_full_message)
+                
+                # Verify add_task_to_session is not called
+                mock_add_task.assert_not_called()
+                
+                # Verify st.rerun is not called
+                mock_rerun.assert_not_called()
+                
+                # Verify success message is not shown
+                mock_success.assert_not_called()
+                
+                # Verify form_data is NOT reset (unchanged from initial values)
+                assert mock_session_state.form_data == original_form_data
+                assert mock_session_state.form_data['title'] == 'Valid Task Title'
+                assert mock_session_state.form_data['assignee'] == 'John Doe'
+                assert mock_session_state.form_data['due_date'] == future_date
+                assert mock_session_state.form_data['description'] == 'Task description'
+                assert mock_session_state.form_data['priority'] == Priority.HIGH.value
+                assert mock_session_state.form_data['labels'] == ['Feature', 'Bug']
+                assert mock_session_state.form_data['estimated_time'] == 4.0
+                assert mock_session_state.form_data['status'] == Status.TODO.value
 
     def test_form_submission_succeeds_with_valid_data(self):
         """Test that form submission succeeds when all required fields are valid."""

@@ -196,15 +196,7 @@ def _initialize_form_state() -> None:
     logger.debug("Initializing task form state in session state")
     
     try:
-        # Initialize form_data if it doesn't exist
-        if "form_data" not in st.session_state:
-            st.session_state.form_data = {}
-        
-        # Initialize form_errors if it doesn't exist
-        if "form_errors" not in st.session_state:
-            st.session_state.form_errors = {}
-        
-        # Ensure all form fields have default values
+        # Define default values
         defaults = {
             "title": "",
             "assignee": "",
@@ -215,6 +207,14 @@ def _initialize_form_state() -> None:
             "estimated_time": 0.5,
             "status": Status.TODO.value
         }
+        
+        # Initialize form_data if it doesn't exist
+        if "form_data" not in st.session_state:
+            st.session_state.form_data = {}
+        
+        # Initialize form_errors if it doesn't exist
+        if "form_errors" not in st.session_state:
+            st.session_state.form_errors = {}
         
         # Migrate from legacy task_form_data if it exists
         if "task_form_data" in st.session_state and st.session_state.task_form_data:
@@ -227,7 +227,7 @@ def _initialize_form_state() -> None:
             if field not in st.session_state.form_data:
                 st.session_state.form_data[field] = default_value
         
-        # Maintain backward compatibility by syncing form_data to task_form_data
+        # Maintain backward compatibility by explicitly syncing form_data to task_form_data
         st.session_state.task_form_data = st.session_state.form_data.copy()
         
         logger.debug("Task form state initialized successfully")
@@ -460,7 +460,8 @@ def _handle_form_submission(db: Session | None) -> None:
             
             add_task_to_session(new_task_dict)
             
-            st.session_state.form_data = {
+            # Define reset defaults
+            reset_defaults = {
                 "title": "",
                 "assignee": "",
                 "due_date": None,
@@ -471,7 +472,9 @@ def _handle_form_submission(db: Session | None) -> None:
                 "status": Status.TODO.value
             }
             
-            st.session_state.task_form_data = st.session_state.form_data.copy()
+            # Explicitly reset both form_data and task_form_data to defaults
+            st.session_state.form_data = reset_defaults.copy()
+            st.session_state.task_form_data = reset_defaults.copy()
             st.session_state.form_errors = {}
             
             st.success("Task created successfully!")
