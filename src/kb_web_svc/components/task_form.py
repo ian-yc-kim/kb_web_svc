@@ -69,7 +69,8 @@ def render_task_form(db: Session) -> None:
                 "Assignee",
                 value=st.session_state.form_data.get("assignee", ""),
                 placeholder="Enter assignee name",
-                help="Optional field. Specify who the task is assigned to."
+                help="Optional field. Specify who the task is assigned to.",
+                key="form_data_assignee"
             )
             
             # Due date field
@@ -90,7 +91,8 @@ def render_task_form(db: Session) -> None:
                 "Description",
                 value=st.session_state.form_data.get("description", ""),
                 placeholder="Enter task description",
-                help="Optional field. Provide detailed information about the task."
+                help="Optional field. Provide detailed information about the task.",
+                key="form_data_description"
             )
         
         with col2:

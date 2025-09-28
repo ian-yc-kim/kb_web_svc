@@ -1,7 +1,7 @@
 """Unit tests for the JSON import/export UI component.
 
 Tests cover UI element presence, export/import functionality, validation,
-backup/rollback operations, and error handling scenarios.
+backup/rollback operations, error handling scenarios, and accessibility features.
 """
 
 import json
@@ -62,26 +62,26 @@ class TestJsonImportExportUI:
     
     @pytest.fixture
     def sample_task_data(self):
-        """Sample valid task data for testing."""
+        """Sample valid task data matching TaskImportData schema."""
         return [
             {
                 "title": "Test Task 1",
                 "description": "Test description 1",
                 "assignee": "user1",
-                "due_date": "2024-12-31T23:59:59",
+                "due_date": "2024-12-31",
                 "priority": "HIGH",
                 "labels": ["test", "ui"],
-                "estimated_time_hours": 8.0,
+                "estimated_time": 8.0,
                 "status": "TODO"
             },
             {
                 "title": "Test Task 2",
                 "description": "Test description 2",
                 "assignee": "user2",
-                "due_date": "2024-12-25T12:00:00",
+                "due_date": "2024-12-25",
                 "priority": "MEDIUM",
                 "labels": ["test"],
-                "estimated_time_hours": 4.0,
+                "estimated_time": 4.0,
                 "status": "IN_PROGRESS"
             }
         ]
@@ -100,18 +100,169 @@ class TestJsonImportExportUI:
         mock_streamlit.subheader.assert_any_call("Import Tasks")
         mock_streamlit.write.assert_called()
         
-        # Verify export button
-        mock_streamlit.button.assert_any_call("Export All Tasks to JSON")
+        # Verify export button (now with accessibility parameters)
+        export_button_calls = [call for call in mock_streamlit.button.call_args_list 
+                             if "Export All Tasks to JSON" in str(call)]
+        assert len(export_button_calls) >= 1, "Export button should be rendered"
         
         # Verify file uploader
         mock_streamlit.file_uploader.assert_called_once_with(
             "Upload JSON file for Import",
             type=["json"],
-            help="Select a JSON file containing task data to import."
+            help="Select a JSON file containing task data to import. The file must contain a valid list of task objects.",
+            key="import_file_uploader"
         )
         
         # Verify markdown separator
         mock_streamlit.markdown.assert_called_with("---")
+    
+    def test_accessibility_export_button(self, db_session, mock_streamlit, mock_services):
+        """Test that export button has accessibility features (help text and key)."""
+        render_json_import_export_ui(db_session)
+        
+        # Find the export button call
+        export_button_calls = [call for call in mock_streamlit.button.call_args_list 
+                             if call[0][0] == "Export All Tasks to JSON"]
+        assert len(export_button_calls) == 1
+        
+        # Verify help parameter is present and descriptive
+        call_args, call_kwargs = export_button_calls[0]
+        assert 'help' in call_kwargs
+        help_text = call_kwargs['help']
+        assert len(help_text) > 10  # Should be descriptive
+        assert 'export' in help_text.lower()
+        assert 'backup' in help_text.lower() or 'sharing' in help_text.lower()
+        
+        # Verify key parameter is present and stable
+        assert 'key' in call_kwargs
+        assert call_kwargs['key'] == 'export_tasks_button'
+    
+    def test_accessibility_file_uploader(self, db_session, mock_streamlit, mock_services):
+        """Test that file uploader has accessibility features (help text and key)."""
+        render_json_import_export_ui(db_session)
+        
+        # Verify file uploader accessibility
+        mock_streamlit.file_uploader.assert_called_once()
+        call_args, call_kwargs = mock_streamlit.file_uploader.call_args
+        
+        # Check label is descriptive
+        label = call_args[0]
+        assert "Upload JSON file for Import" == label
+        
+        # Check help parameter is present and descriptive
+        assert 'help' in call_kwargs
+        help_text = call_kwargs['help']
+        assert len(help_text) > 10  # Should be descriptive
+        assert 'json' in help_text.lower()
+        assert 'import' in help_text.lower()
+        
+        # Check key parameter is present and stable
+        assert 'key' in call_kwargs
+        assert call_kwargs['key'] == 'import_file_uploader'
+        
+        # Check type parameter
+        assert 'type' in call_kwargs
+        assert call_kwargs['type'] == ['json']
+    
+    def test_accessibility_conflict_strategy_radio(self, db_session, mock_streamlit, mock_services, sample_json_content):
+        """Test that conflict strategy radio has accessibility features (help text and key)."""
+        # Upload a file to trigger the radio display
+        uploaded_file = MockUploadedFile(sample_json_content)
+        mock_streamlit.file_uploader.return_value = uploaded_file
+        
+        render_json_import_export_ui(db_session)
+        
+        # Verify radio button accessibility
+        mock_streamlit.radio.assert_called_once()
+        call_args, call_kwargs = mock_streamlit.radio.call_args
+        
+        # Check label is descriptive
+        label = call_args[0]
+        assert "How should conflicts with existing tasks be handled" in label
+        
+        # Check help parameter is present and descriptive
+        assert 'help' in call_kwargs
+        help_text = call_kwargs['help']
+        assert len(help_text) > 20  # Should be descriptive
+        assert 'conflict' in help_text.lower() or 'duplicate' in help_text.lower()
+        
+        # Check key parameter is present and stable
+        assert 'key' in call_kwargs
+        assert call_kwargs['key'] == 'conflict_strategy_radio'
+    
+    def test_accessibility_import_button(self, db_session, mock_streamlit, mock_services, sample_json_content):
+        """Test that import button has accessibility features (help text and key)."""
+        # Upload a file to trigger the import button display
+        uploaded_file = MockUploadedFile(sample_json_content)
+        mock_streamlit.file_uploader.return_value = uploaded_file
+        
+        render_json_import_export_ui(db_session)
+        
+        # Find the import button call
+        import_button_calls = [call for call in mock_streamlit.button.call_args_list 
+                             if call[0][0] == "Import Tasks"]
+        assert len(import_button_calls) == 1
+        
+        # Verify help parameter is present and descriptive
+        call_args, call_kwargs = import_button_calls[0]
+        assert 'help' in call_kwargs
+        help_text = call_kwargs['help']
+        assert len(help_text) > 10  # Should be descriptive
+        assert 'import' in help_text.lower()
+        assert 'strategy' in help_text.lower() or 'conflict' in help_text.lower()
+        
+        # Verify key parameter is present and stable
+        assert 'key' in call_kwargs
+        assert call_kwargs['key'] == 'import_tasks_button'
+        
+        # Verify button type is set to primary
+        assert 'type' in call_kwargs
+        assert call_kwargs['type'] == 'primary'
+    
+    def test_accessibility_download_button(self, db_session, mock_streamlit, mock_services):
+        """Test that download button has accessibility features (help text and key)."""
+        # Configure export button to return True
+        mock_streamlit.button.side_effect = lambda text, **kwargs: text == "Export All Tasks to JSON"
+        
+        # Configure export service to return sample data
+        sample_json = '{"tasks": []}'
+        mock_services['export'].return_value = sample_json
+        
+        with patch('kb_web_svc.components.json_import_export_ui.datetime') as mock_datetime:
+            mock_datetime.now.return_value.strftime.return_value = "20240101_120000"
+            
+            render_json_import_export_ui(db_session)
+        
+        # Verify download button accessibility
+        mock_streamlit.download_button.assert_called_once()
+        call_args, call_kwargs = mock_streamlit.download_button.call_args
+        
+        # Check help parameter is present and descriptive
+        assert 'help' in call_kwargs
+        help_text = call_kwargs['help']
+        assert len(help_text) > 5  # Should reference filename
+        assert 'download' in help_text.lower()
+        
+        # Check key parameter is present and stable
+        assert 'key' in call_kwargs
+        assert call_kwargs['key'] == 'download_exported_json'
+    
+    def test_accessibility_success_error_messages_have_clear_text(self, db_session, mock_streamlit, mock_services, sample_json_content):
+        """Test that success and error messages contain clear text beyond emojis."""
+        uploaded_file = MockUploadedFile(sample_json_content)
+        mock_streamlit.file_uploader.return_value = uploaded_file
+        
+        render_json_import_export_ui(db_session)
+        
+        # Check that success messages have clear text beyond emojis
+        success_calls = mock_streamlit.success.call_args_list
+        for call in success_calls:
+            message = call[0][0]
+            # Remove common emojis and check if there's still meaningful text
+            text_without_emojis = message.replace('✅', '').replace('🎉', '').replace('📊', '').strip()
+            assert len(text_without_emojis) > 5  # Should have substantial text beyond emojis
+            # Should contain descriptive words
+            assert any(word in text_without_emojis.lower() for word in ['successfully', 'found', 'tasks', 'complete', 'imported'])
     
     def test_export_button_functionality(self, db_session, mock_streamlit, mock_services):
         """Test export button triggers export service and download button."""
@@ -136,7 +287,8 @@ class TestJsonImportExportUI:
             data=sample_json,
             file_name="kanban_tasks_export_20240101_120000.json",
             mime="application/json",
-            help="Click to download kanban_tasks_export_20240101_120000.json"
+            help="Click to download the exported tasks as kanban_tasks_export_20240101_120000.json",
+            key="download_exported_json"
         )
     
     def test_export_error_handling(self, db_session, mock_streamlit, mock_services):
@@ -150,7 +302,7 @@ class TestJsonImportExportUI:
         render_json_import_export_ui(db_session)
         
         # Verify error message displayed
-        mock_streamlit.error.assert_any_call("Failed to export tasks. Please try again.")
+        mock_streamlit.error.assert_any_call("❌ Failed to export tasks. Please try again or contact support if the problem persists.")
     
     def test_file_upload_valid_json(self, db_session, mock_streamlit, mock_services, sample_json_content):
         """Test file upload with valid JSON content."""
@@ -167,7 +319,9 @@ class TestJsonImportExportUI:
         mock_streamlit.radio.assert_called_once()
         
         # Verify import button is rendered
-        mock_streamlit.button.assert_any_call("Import Tasks", type="primary")
+        import_button_calls = [call for call in mock_streamlit.button.call_args_list 
+                             if call[0][0] == "Import Tasks"]
+        assert len(import_button_calls) >= 1, "Import button should be rendered"
     
     def test_file_upload_invalid_json(self, db_session, mock_streamlit, mock_services):
         """Test file upload with invalid JSON content."""

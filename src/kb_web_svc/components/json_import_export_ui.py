@@ -49,7 +49,11 @@ def render_json_import_export_ui(db: Session) -> None:
         st.subheader("Export Tasks")
         st.write("Download all current tasks as a JSON file for backup or sharing.")
         
-        if st.button("Export All Tasks to JSON"):
+        if st.button(
+            "Export All Tasks to JSON",
+            help="Click to export all current tasks to a downloadable JSON file for backup or sharing purposes.",
+            key="export_tasks_button"
+        ):
             _handle_export_tasks(db)
         
         st.markdown("---")
@@ -62,7 +66,8 @@ def render_json_import_export_ui(db: Session) -> None:
         uploaded_file = st.file_uploader(
             "Upload JSON file for Import",
             type=["json"],
-            help="Select a JSON file containing task data to import."
+            help="Select a JSON file containing task data to import. The file must contain a valid list of task objects.",
+            key="import_file_uploader"
         )
         
         if uploaded_file is not None:
@@ -99,7 +104,7 @@ def _handle_export_tasks(db: Session) -> None:
             except json.JSONDecodeError:
                 task_count = 0
             
-            st.success(f"Successfully exported {task_count} tasks!")
+            st.success(f"✅ Successfully exported {task_count} tasks!")
             
             # Provide download button
             st.download_button(
@@ -107,14 +112,15 @@ def _handle_export_tasks(db: Session) -> None:
                 data=json_data,
                 file_name=filename,
                 mime="application/json",
-                help=f"Click to download {filename}"
+                help=f"Click to download the exported tasks as {filename}",
+                key="download_exported_json"
             )
             
         logger.info(f"Export completed successfully: {task_count} tasks exported")
         
     except Exception as e:
         logger.error(f"Error during export: {e}", exc_info=True)
-        st.error("Failed to export tasks. Please try again.")
+        st.error("❌ Failed to export tasks. Please try again or contact support if the problem persists.")
 
 
 def _handle_import_section(db: Session, uploaded_file) -> None:
@@ -143,12 +149,17 @@ def _handle_import_section(db: Session, uploaded_file) -> None:
         conflict_strategy = _render_conflict_strategy_selection()
         
         # Import button
-        if st.button("Import Tasks", type="primary"):
+        if st.button(
+            "Import Tasks", 
+            type="primary",
+            help="Click to import the uploaded tasks using the selected conflict resolution strategy.",
+            key="import_tasks_button"
+        ):
             _handle_import_execution(db, tasks_data, conflict_strategy)
         
     except Exception as e:
         logger.error(f"Error in import section: {e}", exc_info=True)
-        st.error("An error occurred while processing the import. Please try again.")
+        st.error("❌ An error occurred while processing the import. Please try again or contact support if the problem persists.")
 
 
 def _read_uploaded_file(uploaded_file) -> str | None:
@@ -177,7 +188,7 @@ def _read_uploaded_file(uploaded_file) -> str | None:
         
     except Exception as e:
         logger.error(f"Error reading uploaded file: {e}", exc_info=True)
-        st.error("Failed to read the uploaded file. Please ensure it's a valid text file.")
+        st.error("❌ Failed to read the uploaded file. Please ensure it's a valid text file and try again.")
         return None
 
 
@@ -238,7 +249,7 @@ def _validate_json_content(file_content: str) -> List[TaskImportData] | None:
         
     except Exception as e:
         logger.error(f"Error validating JSON content: {e}", exc_info=True)
-        st.error("An error occurred while validating the JSON file. Please check the file format.")
+        st.error("❌ An error occurred while validating the JSON file. Please check the file format and try again.")
         return None
 
 
@@ -263,7 +274,8 @@ def _render_conflict_strategy_selection() -> str:
         "**How should conflicts with existing tasks be handled?**",
         options=list(strategy_options.keys()),
         index=list(strategy_options.keys()).index(current_selection) if current_selection in strategy_options else 0,
-        help="Choose how to handle tasks that already exist in your database."
+        help="Choose how to handle tasks that already exist in your database. Skip keeps existing data unchanged, Replace overwrites with imported data, Merge updates only if the imported task is newer.",
+        key="conflict_strategy_radio"
     )
     
     # Store selection in session state
@@ -311,7 +323,7 @@ def _handle_import_execution(db: Session, tasks_data: List[TaskImportData], conf
         
     except Exception as e:
         logger.error(f"Critical error during import execution: {e}", exc_info=True)
-        st.error("❌ A critical error occurred during import. Please try again.")
+        st.error("❌ A critical error occurred during import. Please try again or contact support if the problem persists.")
         
         # Refresh UI regardless of outcome
         try:
