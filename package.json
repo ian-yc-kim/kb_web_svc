@@ -1,0 +1,11 @@
+{
+  "name": "kanban-web-accessibility-audits",
+  "version": "1.0.0",
+  "description": "Node.js dependencies for accessibility audits",
+  "devDependencies": {
+    "pa11y": "^6.2.0"
+  },
+  "scripts": {
+    "pa11y": "pa11y"
+  }
+}

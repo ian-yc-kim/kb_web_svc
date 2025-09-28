@@ -20,6 +20,7 @@ pytz = "^2025.2"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.3"
+playwright = "^1.55.0"
 
 [tool.poetry.scripts]
 kb_web_svc = "kb_web_svc.main:main"
