@@ -10,6 +10,7 @@ from .state_management import initialize_session_state, load_tasks_from_db_to_se
 # Import UI components
 from .components.task_form import render_task_form
 from .components.kanban_board import render_kanban_board
+from .components.json_import_export_ui import render_json_import_export_ui
 
 # Global configuration (if needed)
 st.set_page_config(page_title="kb_web_svc App", layout="wide")
@@ -34,6 +35,18 @@ def render_ui() -> None:
         db = next(db_gen)
         load_tasks_from_db_to_session(db)
         logger.info("Successfully loaded tasks from database to session state")
+        
+        # Add sidebar with import/export functionality
+        with st.sidebar:
+            st.header("Task Management")
+            
+            # JSON Import/Export in an expander
+            with st.expander("📁 Import/Export", expanded=False):
+                try:
+                    render_json_import_export_ui(db)
+                except Exception as import_export_error:
+                    logger.error(f"Error rendering import/export UI: {import_export_error}", exc_info=True)
+                    st.error("Unable to load import/export functionality. Please refresh the page.")
         
         # Display the kanban board UI
         st.title("Kanban Board")

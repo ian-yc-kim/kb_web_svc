@@ -5,5 +5,13 @@ and serialization.
 """
 
 from .task import TaskCreate, TaskResponse, TaskUpdate, TaskDeleteResponse
+from .import_export_schemas import TaskImportData, TaskImportResult
 
-__all__ = ["TaskCreate", "TaskResponse", "TaskUpdate", "TaskDeleteResponse"]
+__all__ = [
+    "TaskCreate", 
+    "TaskResponse", 
+    "TaskUpdate", 
+    "TaskDeleteResponse",
+    "TaskImportData",
+    "TaskImportResult"
+]

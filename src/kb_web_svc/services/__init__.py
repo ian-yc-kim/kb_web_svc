@@ -16,6 +16,12 @@ from .task_service import (
     InvalidStatusTransitionError
 )
 
+from .json_import_export_service import (
+    export_all_tasks_to_json,
+    restore_database_from_json_backup,
+    import_tasks_logic
+)
+
 __all__ = [
     "create_task", 
     "update_task",
@@ -25,5 +31,8 @@ __all__ = [
     "PastDueDateError",
     "TaskNotFoundError",
     "OptimisticConcurrencyError",
-    "InvalidStatusTransitionError"
+    "InvalidStatusTransitionError",
+    "export_all_tasks_to_json",
+    "restore_database_from_json_backup",
+    "import_tasks_logic"
 ]
